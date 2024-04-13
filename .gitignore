@@ -3,3 +3,5 @@
 *.jpg
 *.pdf
 *.xml
+# all the pycache
+__pycache__/

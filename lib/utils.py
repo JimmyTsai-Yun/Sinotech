@@ -13,6 +13,10 @@ import base64
 from mimetypes import guess_type
 from roboflow import Roboflow
 
+from threading import Thread
+from shutil import get_terminal_size
+from time import sleep
+
 '''
 Construct easyocr reader object
 '''
@@ -231,3 +235,45 @@ def block_split_by_ocr(ocr_predict_result, img, drawing_type="sheet_pile-rebar")
         section_img_list.append(img[int(temp_block[1]):int(temp_block[3]), int(temp_block[0]):int(temp_block[2])])
 
     return block, section_img_list
+
+class Loader:
+    def __init__(self, desc="Loading...", end="Done!", timeout=0.1):
+        """
+        A loader-like context manager
+
+        Args:
+            desc (str, optional): The loader's description. Defaults to "Loading...".
+            end (str, optional): Final print. Defaults to "Done!".
+            timeout (float, optional): Sleep time between prints. Defaults to 0.1.
+        """
+        self.desc = desc
+        self.end = end
+        self.timeout = timeout
+
+        self._thread = Thread(target=self._animate, daemon=True)
+        self.steps = ["⢿", "⣻", "⣽", "⣾", "⣷", "⣯", "⣟", "⡿"]
+        self.done = False
+
+    def start(self):
+        self._thread.start()
+        return self
+
+    def _animate(self):
+        for c in cycle(self.steps):
+            if self.done:
+                break
+            print(f"\r{self.desc} {c}", flush=True, end="")
+            sleep(self.timeout)
+
+    def __enter__(self):
+        self.start()
+
+    def stop(self):
+        self.done = True
+        cols = get_terminal_size((80, 20)).columns
+        print("\r" + " " * cols, end="", flush=True)
+        print(f"\r{self.end}", flush=True)
+
+    def __exit__(self, exc_type, exc_value, tb):
+        # handle exceptions with those variables ^
+        self.stop()
