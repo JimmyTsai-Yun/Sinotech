@@ -102,8 +102,8 @@ def GPT4_call(client, data_url, prompt_text):
 Template for the GPT4 API call
 '''
 def Call_GPT4_response(client, img_path, drawing_type = "sheet_pile-rebar"):
-    all_type_drawings = {"sheet_pile-rebar":"Tell me the type of the sheet pile and the lenght of it. please response as the following template:{pile_type}:{length} e.g. SP-III:10m. just return the template, do not return any other information.",
-                            "sheet_pile-eval":"Tell me if the drawing is about sheet pile, if not return 'None', if yes tell me the type of the sheet pile and the lenght of it. please response as the following template:{pile_type}:{length} e.g. SP-III:10m. just return the template, do not return any other information." }
+    all_type_drawings = {"sheet_pile-rebar":"Tell me the type of the sheet pile and the length of it. please response as the following template:{pile_type}:{length} e.g. SP-III:10m. just return the template, do not return any other information.",
+                            "sheet_pile-eval":"Tell me if the drawing is about a sheet pile, if not return 'None', if yes tell me the type of the sheet pile and the length of it. please response as the following template:{pile_type}:{length} e.g. SP-III:10m. just return the template, do not return any other information." }
     data_url = local_image_to_data_url(img_path)
     try:
         prompt_text = all_type_drawings[drawing_type]
