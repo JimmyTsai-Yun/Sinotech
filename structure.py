@@ -1,4 +1,5 @@
 from lib.utils import *
+from lib.structure_utils import get_the_num, check_is_right
 import keyboard
 import tkinter as tk
 from tkinter import filedialog
@@ -37,29 +38,11 @@ class Base_structure():
         img_gray = cv2.cvtColor(np.array(images[0]), cv2.COLOR_BGR2GRAY)
         return img_gray
 
-class Diaphragm_structure(Base_structure):
-    """Base class for handling PDF to image conversion and OCR processing."""
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
 
+class Diaphragm_structure(Base_structure):
     """Derived class for specific operations on Diaphragm structure drawings."""
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
-    @staticmethod
-    def check_is_right(array, string, count):
-        return array[count-1][1] if string.find('f\'c') == -1 else 'True'
-
-    @staticmethod
-    def get_the_num(string):
-        indices = [j for j, k in enumerate(string) if k in [' ', '=']]
-        if len(indices) < 2:
-            indices.append(indices[0])
-            for c, char in enumerate(string):
-                if char == '2':
-                    indices[0] = c
-                    break
-        return string[indices[0]+1 : indices[1]]
     
     def extrct_data(self, array):
         # rules
@@ -80,7 +63,7 @@ class Diaphragm_structure(Base_structure):
                 j = i
                 while s_big_check:
                     if (array[j][1].upper()).find('KGF') > -1:
-                        rebar_strength1 = self.get_the_num(array[j][1])
+                        rebar_strength1 = get_the_num(array[j][1])
                         s_big_check = False
                     j+=1   
 
@@ -89,7 +72,7 @@ class Diaphragm_structure(Base_structure):
                 k = i
                 while s_small_check:
                     if (array[k][1].upper()).find('KGF') > -1:
-                        rebar_strength2 = self.get_the_num(array[k][1])
+                        rebar_strength2 = get_the_num(array[k][1])
                         s_small_check = False
                     k+=1  
 
@@ -104,12 +87,11 @@ class Diaphragm_structure(Base_structure):
                         while wall_check2 :
                             if (array[w][1].upper()).find('KGF') > -1 :
                                 wall_check2 = False
-                                call = self.check_is_right(array, array[w][1], w)
+                                call = check_is_right(array, array[w][1], w)
                                 if call == 'True':
-                                    wall_strength1 = self.get_the_num(array[w][1])
+                                    wall_strength1 = get_the_num(array[w][1])
                                 else:
                                     wall_strength1 = call 
-                                count3 = w
                             w+=1
                         while wall_check3 :
                             if (array[l][1].upper()).find('DIAPHRAGM WALLS') > -1 :
@@ -117,9 +99,9 @@ class Diaphragm_structure(Base_structure):
                                 o = l
                                 while wall_check4 :
                                     if (array[o][1].upper()).find('KGF') > -1 :
-                                        call = self.check_is_right(array, array[o][1], o)
+                                        call = check_is_right(array, array[o][1], o)
                                         if call == 'True':
-                                            wall_strength2 = self.get_the_num(array[o][1])
+                                            wall_strength2 = get_the_num(array[o][1])
                                         else:
                                             wall_strength2 = call 
                                         wall_check4 = False
@@ -251,9 +233,11 @@ class Diaphragm_structure(Base_structure):
             super().wait_pdf()
 
             img_gray = super().pdf2img()
-            array = self.ocr_tool.ocr(img_gray)
-
-            rebar_strength1, rebar_strength2, wall_strength1, wall_strength2 = self.extrct_data(array)
+            if self.use_azure:
+                pass
+            else:
+                array = self.ocr_tool.ocr(img_gray)
+                rebar_strength1, rebar_strength2, wall_strength1, wall_strength2 = self.extrct_data(array)
 
         except Exception as e:
             print(f"An error occurred: {e}")
