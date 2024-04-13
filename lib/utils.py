@@ -1,14 +1,12 @@
 import cv2
 import numpy as np
 from pdf2image import convert_from_path
-import PIL
 import easyocr
 import os
 import copy
 from dotenv import load_dotenv, find_dotenv
 from openai import AzureOpenAI
 import os
-import json
 import base64
 from mimetypes import guess_type
 from roboflow import Roboflow
@@ -16,6 +14,9 @@ from roboflow import Roboflow
 from threading import Thread
 from shutil import get_terminal_size
 from time import sleep
+from itertools import cycle
+import threading
+import time
 
 '''
 Construct easyocr reader object
@@ -23,6 +24,41 @@ Construct easyocr reader object
 def construct_easyocr_reader():
     reader = easyocr.Reader(['en'])
     return reader
+
+class OCRTool():
+    def __init__(self, type="ch_tra"):
+        """Initialize the OCR tool with the specified languages."""
+        if type == "ch_tra":
+            self.reader = easyocr.Reader(['ch_tra', 'en'])
+        else:
+            self.reader = easyocr.Reader(['en'])
+        self.processing = False
+
+    def ocr(self, img_gray):
+        """Perform OCR on the given image and print progress."""
+        self.processing = True
+        start_time = time.time()  # Start time for measuring duration
+
+        # Start a thread to show processing message
+        thread = threading.Thread(target=self.show_progress, args=(start_time,))
+        thread.start()
+
+        # Perform OCR
+        bounds = self.reader.readtext(img_gray, detail=1)
+
+        # Stop showing progress
+        self.processing = False
+        thread.join()  # Wait for the progress thread to finish
+
+        return bounds
+
+    def show_progress(self, start_time):
+        """Show a processing message with a timer until OCR is done."""
+        while self.processing:
+            elapsed_time = int(time.time() - start_time)  # Calculate elapsed time in seconds
+            print(f"OCR正在執行中...已執行 {elapsed_time} 秒", end="\r")
+            time.sleep(1)  # Update every second
+        print("OCR處理完成!                                    ")  # Clear the message and ensure it overwrites any leftover text
 
 '''
 Construct robolow model object
