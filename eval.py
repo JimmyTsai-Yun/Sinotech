@@ -1,6 +1,12 @@
 from lib.utils import *
-import sys
 import keyboard
+
+# -------------------------------------------------------------------- #
+'''
+The Base_eval class is a parent class that contains the common methods 
+and attributes for all the plan classes.
+'''
+# -------------------------------------------------------------------- #
 
 class Base_eval():
     def __init__(self, **kwargs) -> None:
@@ -30,6 +36,8 @@ class Base_eval():
             loader.stop()
         except Exception as e:
             print(f"Error during PDF wait: {e}")
+
+# -------------------------------------------------------------------- #
 
 class SheetPile_eval(Base_eval):
     def __init__(self, **kwargs) -> None:
@@ -62,9 +70,14 @@ class SheetPile_eval(Base_eval):
                     os.remove(block_img_path)
             else:
                 self.ocr_tool = OCRTool(type="en")
-                array = self.ocr_tool.ocr(img)
-                response = None
-                response_list.append(response)
+                ocr_reulst = self.ocr_tool.ocr(img)
+                response = []
+                for text_info in ocr_reulst:
+                    if text_info[1].find("SHEET FILE") != -1:
+                        extracted_rawtext = text_info[1]
+                        converted_text = self.convert_sheet_pile_typename(extracted_rawtext)
+
+                response_list.append(converted_text)
 
         return response_list
     
@@ -83,7 +96,18 @@ class SheetPile_eval(Base_eval):
 
     def save_to_xml(self, response_list):
         pass
-                    
+    
+    def convert_sheet_pile_typename(self, sheet_pile_type):
+            # 檢查是否含有 "SP-W" 或 "SP-MI"
+        if "SP-W" in sheet_pile_type:
+            # 將 "SP-W" 替換為 "SP-III"
+            return sheet_pile_type.replace("SP-W", "SP-III")
+        elif "SP-MI" in sheet_pile_type:
+            # 將 "SP-MI" 替換為 "SP-III"
+            return sheet_pile_type.replace("SP-MI", "SP-III")
+        else:
+            # 如果輸入不含有 "SP-W" 或 "SP-MI"，返回原始輸入
+            return sheet_pile_type
 
         
 

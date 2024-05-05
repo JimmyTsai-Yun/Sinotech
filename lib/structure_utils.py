@@ -1,7 +1,7 @@
 
 
 def check_is_right(array, string, count):
-    return array[count-1][1] if string.find('f\'c') == -1 else 'True'
+    return array[count-1][1] if string.find('f\'c') == -1 or string.find('fc') == -1 else 'True'
 
 def get_the_num(string):
     indices = [j for j, k in enumerate(string) if k in [' ', '=']]

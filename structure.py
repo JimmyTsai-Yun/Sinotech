@@ -94,7 +94,7 @@ class Diaphragm_structure(Base_structure):
                                     wall_strength1 = call 
                             w+=1
                         while wall_check3 :
-                            if (array[l][1].upper()).find('DIAPHRAGM WALLS') > -1 :
+                            if (array[l][1].upper()).find('WALLS') > -1 :
                                 wall_check3 = False
                                 o = l
                                 while wall_check4 :
