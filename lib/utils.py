@@ -79,12 +79,21 @@ def pdf_to_images(pdf_path, dpi=210, output_folder="./", drawing_type="sheet_pil
     for i, image in enumerate(images):
         cv2_img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
         img_gray = cv2.cvtColor(cv2_img, cv2.COLOR_BGR2GRAY)
-        _, img_th = cv2.thershold(img_gray, 240, 255, 0)
+        _, img_th = cv2.threshold(img_gray, 240, 255, 0)
         img_blur = cv2.GaussianBlur(img_th, (5, 5), 0)
         imgs_list.append(img_blur)
         cv2.imwrite(output_folder + drawing_type + f"{i}.png", img_blur)
 
     return imgs_list
+
+def pdf2images(pdf_path, dpi=210):
+    images = convert_from_path(pdf_path, dpi=dpi)
+    imgs_list = []
+    for image in images:
+        np_img = np.array(image)
+        imgs_list.append(np_img)
+    return imgs_list
+
 
 '''
 Prepare for GPT4
