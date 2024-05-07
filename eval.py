@@ -97,6 +97,25 @@ class SheetPile_eval(Base_eval):
 
     def save_to_xml(self, response_list):
         print(response_list)
+        # 檢查是否已經有xml檔案，若有則讀取，若無則創建
+        tree, root = create_or_read_xml(self.output_path)
+        # 檢查是否有plans子節點，若無則創建，若有則刪除
+        evals = root.find(".//Drawing[@description='立面圖']")
+        if evals is None:
+            evals = ET.SubElement(root, "Drawing", description="立面圖")
+        else:
+            # 移除plans的所有子節點
+            for child in evals:
+                evals.remove(child)
+        # 將response_list寫入平面圖子節點
+        for pile_type in response_list:
+            pile = ET.SubElement(evals, 'WorkItemType', description=pile_type)
+            
+        tree.write(self.output_path)
+
+
+
+
     
     def convert_sheet_pile_typename(self, sheet_pile_type):
             # 檢查是否含有 "SP-W" 或 "SP-MI"

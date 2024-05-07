@@ -10,6 +10,8 @@ import os
 import base64
 from mimetypes import guess_type
 from roboflow import Roboflow
+import elementpath
+from xml.etree import ElementTree as ET
 
 from threading import Thread
 from shutil import get_terminal_size
@@ -322,3 +324,14 @@ class Loader:
     def __exit__(self, exc_type, exc_value, tb):
         # handle exceptions with those variables ^
         self.stop()
+
+def create_or_read_xml(xml_path):
+    try:
+        tree = ET.parse(xml_path)
+        root = tree.getroot()
+    except FileNotFoundError:
+        root = ET.Element('File', description='設計圖說')
+        tree = ET.ElementTree(root)
+        tree.write(xml_path, encoding='utf-8', xml_declaration=True)
+
+    return tree, root
