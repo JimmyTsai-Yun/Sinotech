@@ -426,18 +426,24 @@ def compute_wall_length(segmented_data):
                      'III ': 'III ',
                      'IIl ': 'III ',
                      'Ill ': 'III ',
-                     'Iil ': 'III '
+                     'Iil ': 'III ',
+                     'IlI' : 'III '
                      }
-        pattern = r'SP-(.*?)SHEET'
-        match = re.search(pattern, wall_type_string)
+    
+        pattern1 = r'SP-(.*?)SHEET'
+        pattern2 = r'(L)([^=])(\w+)'
+        match = re.search(pattern1, wall_type_string)
         if match:
             target_string =  match.group(1)
-            try:
-                trans_string = match_dic[target_string]
-            except:
-                trans_string = target_string
-        # replace the original string with the new string
-        return wall_type_string.replace(target_string, trans_string)
+            trans_string = match_dic.get(target_string, target_string)
+
+        wall_type_string = wall_type_string.replace(target_string, trans_string)
+
+        match2 = re.search(pattern2, wall_type_string)
+        if match2:
+            wall_type_string = re.sub(pattern2, r'\1=\3', wall_type_string)
+        
+        return wall_type_string
 
     type_length_dict = {}
     for info in segmented_data['upper']:
@@ -462,7 +468,7 @@ def sheetpile_plan_brute_force(ann_img, wall_img, ocr_tool):
     Brute force method to compute the wall length.
     '''
 
-    cv2_annotation_image = cv2.cvtColor(np.asarray(ann_img), cv2.COLOR_RGB2BGR)
+    cv2_annotation_image = cv2.cvtColor(ann_img, cv2.COLOR_RGB2BGR)
     gray_annotation_img = cv2.cvtColor(cv2_annotation_image, cv2.COLOR_BGR2GRAY)
     _, th_annotation_img = cv2.threshold (gray_annotation_img, 240, 255, 0)
     GaussianBlur_annotation_img = cv2.GaussianBlur(th_annotation_img, (5, 5), 0)
@@ -576,6 +582,8 @@ def sheetpile_plan_brute_force(ann_img, wall_img, ocr_tool):
         if float(annotation_img_lines[i][0,0]) > float(annotation_img_lines[i][0,2]):
             hori_line.remove(i)
 
+    print(f'hori_line: {hori_line}')
+
     # helper function
     def arrow_line_pairing(hori_line, hori_arrow, vert_line, vert_arrow, arrow_contours, annotation_img_lines, df, raw_img, draw=False):
         count = 0
@@ -625,6 +633,8 @@ def sheetpile_plan_brute_force(ann_img, wall_img, ocr_tool):
     annotation_df = arrow_line_pairing(hori_line, hori_arrow, vert_line, vert_arrow, arrow_contours, annotation_img_lines, annotation_df, copy.deepcopy(raw_annotation_img), draw=False)
     annotation_df_all = annotation_df.dropna(axis='index', how='all')
 
+    print(f'annotation_df_all: {annotation_df_all}')
+
     print("complete arrow line pairing")
         
     pair_array = []
@@ -633,7 +643,7 @@ def sheetpile_plan_brute_force(ann_img, wall_img, ocr_tool):
     for j, bound in enumerate(bounds):
         bound = list(bound)
         if (bound[1].upper()).find(key_word) > -1:
-            dis = 1000000
+            dis = 10000000000
             middle_point = [(bounds[j][0][0][0] + bounds[j][0][2][0]) // 2,(bounds[j][0][0][1] + bounds[j][0][2][1]) // 2]
             check: int = 0
             for k in range(len(annotation_df_all)):
@@ -643,6 +653,8 @@ def sheetpile_plan_brute_force(ann_img, wall_img, ocr_tool):
                     dis = (middle_point[0]-p_mean[0])**2 + (middle_point[1]-p_mean[1])**2
                     check = annotation_df_all.index[k]
             pair_array.append([j,check])
+
+    print(f'pair_array: {pair_array}')
 
     # 整理成dataframe
     index = list(range(len(pair_array)))

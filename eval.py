@@ -43,7 +43,7 @@ class SheetPile_eval(Base_eval):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.prompt = "Tell me if the drawing is about a sheet pile, if not return 'None', if yes tell me the type of the sheet pile and the length of it. please response as the following template:{pile_type}:{length} e.g. SP-III:10m. just return the template, do not return any other information." 
-    
+        self.ocr_tool = OCRTool(type="en")
     def extract_data(self, imgs_list):
         num_imgs = len(imgs_list)
         response_list = []
@@ -69,21 +69,22 @@ class SheetPile_eval(Base_eval):
                     response_list.append(response.choices[0].message.content)
                     os.remove(block_img_path)
             else:
-                self.ocr_tool = OCRTool(type="en")
                 ocr_reulst = self.ocr_tool.ocr(img)
                 response = []
+                converted_text = None
                 for text_info in ocr_reulst:
-                    if text_info[1].find("SHEET FILE") != -1:
+                    if text_info[1].find("SHEET PILE") != -1:
+                        print(text_info[1])
                         extracted_rawtext = text_info[1]
                         converted_text = self.convert_sheet_pile_typename(extracted_rawtext)
 
-                response_list.append(converted_text)
+                        response_list.append(converted_text)
 
         return response_list
     
     def run(self):
         # change pdf to images
-        imgs_list = pdf_to_images(self.pdf_path, dpi=210, output_folder="./", drawing_type="sheet_pile-rebar")
+        imgs_list = pdf_to_images(self.pdf_path, dpi=210, output_folder="./", drawing_type="sheet_pile-eval")
 
         # extract data from images
         response_list = self.extract_data(imgs_list)
@@ -95,16 +96,30 @@ class SheetPile_eval(Base_eval):
         self.save_to_xml(response_list)
 
     def save_to_xml(self, response_list):
-        pass
+        print(response_list)
     
     def convert_sheet_pile_typename(self, sheet_pile_type):
             # 檢查是否含有 "SP-W" 或 "SP-MI"
         if "SP-W" in sheet_pile_type:
             # 將 "SP-W" 替換為 "SP-III"
-            return sheet_pile_type.replace("SP-W", "SP-III")
+            sheet_pile_type = sheet_pile_type.replace("SP-W", "SP-III")
+            return sheet_pile_type
         elif "SP-MI" in sheet_pile_type:
             # 將 "SP-MI" 替換為 "SP-III"
-            return sheet_pile_type.replace("SP-MI", "SP-III")
+            sheet_pile_type = sheet_pile_type.replace("SP-MI", "SP-III")
+            return sheet_pile_type
+        elif "SP- m" in sheet_pile_type:
+            # 將 "SP-MI" 替換為 "SP-III"
+            sheet_pile_type = sheet_pile_type.replace("SP- m", "SP-III")
+            return sheet_pile_type
+        elif "SP- MI" in sheet_pile_type:
+            # 將 "SP-MI" 替換為 "SP-III"
+            sheet_pile_type = sheet_pile_type.replace("SP- MI", "SP-III")
+            return sheet_pile_type
+        elif "SP- W" in sheet_pile_type:
+            # 將 "SP-MI" 替換為 "SP-III"
+            sheet_pile_type = sheet_pile_type.replace("SP- W", "SP-III")
+            return sheet_pile_type
         else:
             # 如果輸入不含有 "SP-W" 或 "SP-MI"，返回原始輸入
             return sheet_pile_type
