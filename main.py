@@ -12,7 +12,7 @@ def main():
     parser.add_argument("-d", "--drawing_type", dest="drawing_type", help="The type of drawing", default="None")
     parser.add_argument("-p", "--pdf_path", dest="pdf_path", help="The path to the pdf", default=".\\-Layout1.pdf")
     parser.add_argument("-c", "--csv_path", dest="csv_path", help="The path to the csv", default="None")
-    parser.add_argument("-o", "--output_path", dest="output_path", help="The path to the output file", default=".\\") 
+    parser.add_argument("-o", "--output_path", dest="output_path", help="The path to the output file", default=".\\result.xml") 
     parser.add_argument("-u", "--use_azure", dest="use_azure", help="Use GPT-4", default=False, action='store_true')
     # A optional argument for the pdf2 path (plan drawing may have 2 pdfs)
     parser.add_argument("-p2", "--pdf2_path", dest="pdf2_path", help="The path to the second pdf", default=".\\-Layout2.pdf")

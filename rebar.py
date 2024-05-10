@@ -57,7 +57,6 @@ class SheetPile_rebar(Base_rebar):
                 if text_info[1].find("SHEET PILE") != -1:
                     extracted_rawtext = text_info[1]
                     converted_text = self.convert_sheet_pile_typename(extracted_rawtext)
-                    print(text_info[1] , converted_text)
                     response_list.append(converted_text)
 
         return response_list
@@ -76,7 +75,7 @@ class SheetPile_rebar(Base_rebar):
         self.save_to_xml(response_list)
     
     def save_to_xml(self, response_list):
-        print(response_list)
+        print("資料萃取結果: ", response_list)
         # 檢查是否已經有xml檔案，若有則讀取，若無則創建
         tree, root = create_or_read_xml(self.output_path)
         # 檢查是否有plans子節點，若無則創建，若有則刪除
@@ -85,13 +84,14 @@ class SheetPile_rebar(Base_rebar):
             rebars = ET.SubElement(root, "Drawing", description="配筋圖")
         else:
             # 移除plans的所有子節點
-            for child in rebars:
+            for child in list(rebars):
                 rebars.remove(child)
         # 將response_list寫入平面圖子節點
         for pile_type in response_list:
             pile = ET.SubElement(rebars, 'WorkItemType', description=pile_type)
         
-        tree.write(self.output_path)
+        # 寫入xml檔案，utf-8編碼
+        tree.write(self.output_path, encoding="utf-8")
 
     def convert_sheet_pile_typename(self, sheet_pile_type):
         replacements = {

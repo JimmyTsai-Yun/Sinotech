@@ -127,14 +127,14 @@ class Sheetpile_plan(Base_plan):
             plans = ET.SubElement(root, "Drawing", description='平面圖')
         else:
             # 移除plans的所有子節點
-            for child in plans:
+            for child in list(plans):
                 plans.remove(child)
         # 將response_list寫入平面圖子節點
         for key, value in response_dic.items():
             pile = ET.SubElement(plans, 'WorkItemType', description=key, quantity=str(value))
 
         # 將xml檔案寫入
-        tree.write(self.output_path)
+        tree.write(self.output_path, encoding="utf-8")
 
 class Diaphragm_plan(Base_plan):
     def __init__(self, **kwargs) -> None:
