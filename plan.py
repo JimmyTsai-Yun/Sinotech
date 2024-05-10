@@ -118,8 +118,23 @@ class Sheetpile_plan(Base_plan):
 
         self.save_to_xml(final_respones)
 
-    def save_to_xml(self, response_list):
-        print(response_list)
+    def save_to_xml(self, response_dic):
+        # 檢查是否已經有xml檔案，若有則讀取，若無則創建
+        tree, root = create_or_read_xml(self.output_path)
+        # 檢查是否有plans子節點，若無則創建，若有則刪除
+        plans = root.find(".//Drawing[@description='平面圖']")
+        if plans is None:
+            plans = ET.SubElement(root, "Drawing", description='平面圖')
+        else:
+            # 移除plans的所有子節點
+            for child in plans:
+                plans.remove(child)
+        # 將response_list寫入平面圖子節點
+        for key, value in response_dic.items():
+            pile = ET.SubElement(plans, 'WorkItemType', description=key, quantity=str(value))
+
+        # 將xml檔案寫入
+        tree.write(self.output_path)
 
 class Diaphragm_plan(Base_plan):
     def __init__(self, **kwargs) -> None:
