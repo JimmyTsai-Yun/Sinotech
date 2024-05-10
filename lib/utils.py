@@ -82,7 +82,7 @@ def pdf_to_images(pdf_path, dpi=210, output_folder="./", drawing_type="sheet_pil
         _, img_th = cv2.threshold(img_gray, 240, 255, 0)
         img_blur = cv2.GaussianBlur(img_th, (5, 5), 0)
         imgs_list.append(img_blur)
-        cv2.imwrite(output_folder + drawing_type + f"{i}.png", img_blur)
+        # cv2.imwrite(output_folder + drawing_type + f"{i}.png", img_blur)
 
     return imgs_list
 
