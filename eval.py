@@ -109,17 +109,18 @@ class SheetPile_eval(Base_eval):
         # 將response_list寫入平面圖子節點
         for pile_type in response_list:
             sheetpile_type, sheetpile_depth = extract_sheetpile_type_depth(pile_type)
-            pile = ET.SubElement(evals, 'WorkItemType', description="DEPTH", DEPTH=f"Depth {sheetpile_depth}m")
+            print(sheetpile_type, sheetpile_depth)
+            pile = ET.SubElement(evals, 'WorkItemType', description="DEPTH", DEPTH=f"Depth {str(sheetpile_depth)}m")
             # 在pile底下建立Sheetpile子節點
             sheetpile = ET.SubElement(pile, 'Sheetpile', description="鋼板樁")
             # 在pile底下建立type子節點
             type = ET.SubElement(sheetpile, 'Type', description="鋼板樁型號")
-            type_value = ET.SubElement(type, 'Value', unit="m")
+            type_value = ET.SubElement(type, 'Value')
             type_value.text = sheetpile_type
             # 在type底下建立height子節點
             depth = ET.SubElement(sheetpile, 'Depth', description="鋼板樁深度")
             depth_value = ET.SubElement(depth, 'Value', unit="m")
-            depth_value.text = sheetpile_depth
+            depth_value.text = str(sheetpile_depth)
             
         tree.write(self.output_path, encoding="utf-8")
 

@@ -19,6 +19,7 @@ from time import sleep
 from itertools import cycle
 import threading
 import time
+import re
 
 '''
 Construct easyocr reader object
@@ -335,3 +336,18 @@ def create_or_read_xml(xml_path):
         tree.write(xml_path, encoding='utf-8', xml_declaration=True)
 
     return tree, root
+
+def extract_sheetpile_type_depth(s):
+    # 使用正規表達式匹配型號和可能的數字錯誤
+    match = re.search(r"(\w+-\w+)\s+SHEET PILE \(L=([0-9l]+)m\)", s)
+    if match:
+        model = match.group(1)
+        # 將 'l' 替換為 '1'，只在數字部分處理
+        length_str = match.group(2).replace('l', '1').replace('L', '1')
+        try:
+            length = int(length_str)  # 嘗試轉換修正後的字符串為整數
+            return model, length
+        except ValueError:
+            return model, None  # 如果仍然出現轉換錯誤，則回傳 None 表示長度無效
+    else:
+        return None, None
