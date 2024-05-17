@@ -1,4 +1,5 @@
 from lib.utils import *
+from lib.utils import extract_sheetpile_type_depth
 # from lib.plans_utils import convert_rgb_to_gaussian_blur, convert_rgb_to_dilate
 # from lib.plans_utils import arrow_detection, ann_line_detection, line_arrow_pair, pair_ocr_with_line_arrow
 # from lib.plans_utils import wall_line_detection, group_lines, segment_main_lines_with_labels, compute_wall_length
@@ -131,7 +132,23 @@ class Sheetpile_plan(Base_plan):
                 plans.remove(child)
         # 將response_list寫入平面圖子節點
         for key, value in response_dic.items():
-            pile = ET.SubElement(plans, 'WorkItemType', description=key, quantity=str(value))
+            sheetpile_type, sheetpile_depth = extract_sheetpile_type_depth(key)
+            pile = ET.SubElement(plans, 'WorkItemType', description="DEPTH", DEPTH=f"Depth {sheetpile_depth}m")
+            # 在pile底下建立Sheetpile子節點
+            sheetpile = ET.SubElement(pile, 'Sheetpile', description="鋼板樁")
+            # 在sheetpile底下建立type子節點
+            type = ET.SubElement(sheetpile, 'Type', description="鋼板樁型號")
+            type_value = ET.SubElement(type, 'Value')
+            type_value.text = sheetpile_type
+            # 在type底下建立length子節點
+            ET.SubElement(sheetpile, 'Total', description="鋼板樁行進米")
+            type_value = ET.SubElement(type, 'Value', unit="m")
+            type_value.text = sheetpile_type
+            # 在type底下建立height子節點
+            depth = ET.SubElement(sheetpile, 'Depth', description="鋼板樁深度")
+            depth_value = ET.SubElement(depth, 'Value', unit="m")
+            depth_value.text = sheetpile_depth
+
 
         # 將xml檔案寫入
         tree.write(self.output_path, encoding="utf-8")
