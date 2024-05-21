@@ -73,6 +73,9 @@ class SheetPile_rebar(Base_rebar):
 
         # write the response to xml file
         self.save_to_xml(response_list)
+
+        # remove the pdf
+        os.remove(self.pdf_path)
     
     def save_to_xml(self, response_list):
         print("資料萃取結果: ", response_list)

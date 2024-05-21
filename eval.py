@@ -94,6 +94,9 @@ class SheetPile_eval(Base_eval):
         # write the response to xml file
         self.save_to_xml(response_list)
 
+        # remove the pdf
+        os.remove(self.pdf_path)
+
     def save_to_xml(self, response_list):
         print("資料萃取結果: ",response_list)
         # 檢查是否已經有xml檔案，若有則讀取，若無則創建

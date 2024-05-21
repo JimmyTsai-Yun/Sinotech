@@ -116,8 +116,17 @@ class Sheetpile_plan(Base_plan):
                     final_respones[key] += value
                 else:
                     final_respones[key] = value
+        
+        # 把結果印出來
+        for key, value in final_respones.items():
+            print(f"{key}: {value:.2f}m")
 
+        # 把結果寫入xml檔案
         self.save_to_xml(final_respones)
+
+        # 刪除暫存檔
+        os.remove(self.annotation_pdf_path)
+        os.remove(self.wall_pdf_path)
 
     def save_to_xml(self, response_dic):
         # 檢查是否已經有xml檔案，若有則讀取，若無則創建
@@ -134,21 +143,20 @@ class Sheetpile_plan(Base_plan):
         for key, value in response_dic.items():
             sheetpile_type, sheetpile_depth = extract_sheetpile_type_depth(key)
             pile = ET.SubElement(plans, 'WorkItemType', description="DEPTH", DEPTH=f"Depth {str(sheetpile_depth)}m")
-            # 在pile底下建立Sheetpile子節點
+            # 在 pile 底下建立Sheetpile子節點
             sheetpile = ET.SubElement(pile, 'Sheetpile', description="鋼板樁")
-            # 在sheetpile底下建立type子節點
+            # 在 sheetpile 底下建立type子節點
             type = ET.SubElement(sheetpile, 'Type', description="鋼板樁型號")
             type_value = ET.SubElement(type, 'Value')
             type_value.text = sheetpile_type
-            # 在type底下建立length子節點
+            # 在 sheetpile 底下建立length子節點
             length = ET.SubElement(sheetpile, 'Total', description="鋼板樁行進米")
             length_value = ET.SubElement(length, 'Value', unit="m")
             length_value.text = str(value)
-            # 在type底下建立height子節點
+            # 在 sheetpile 底下建立height子節點
             depth = ET.SubElement(sheetpile, 'Depth', description="鋼板樁深度")
             depth_value = ET.SubElement(depth, 'Value', unit="m")
             depth_value.text = str(sheetpile_depth)
-
 
         # 將xml檔案寫入
         tree.write(self.output_path, encoding="utf-8")
