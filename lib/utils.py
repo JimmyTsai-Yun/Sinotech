@@ -77,7 +77,7 @@ Function to convert pdf to images,
 input is the path to the pdf file, output is a list of images
 '''
 def pdf_to_images(pdf_path, dpi=210, output_folder="./", drawing_type="sheet_pile-rebar", preprocess=True):
-    images = convert_from_path(pdf_path, dpi=dpi, poppler_path='..\poppler-24.02.0\\Library\\bin')
+    images = convert_from_path(pdf_path, dpi=dpi, poppler_path='..\\poppler-24.02.0\\Library\\bin')
     imgs_list = []
     if not preprocess:
         for i, image in enumerate(images):

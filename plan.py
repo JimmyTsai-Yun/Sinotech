@@ -120,8 +120,19 @@ class Sheetpile_plan(Base_plan):
                     final_respones[key] = value
         
         # 把結果印出來
+        gui_dict = {}
         for key, value in final_respones.items():
             print(f"{key}: {value:.2f}m")
+            single_type_result = {}
+            sheetpile_type, sheetpile_depth = extract_sheetpile_type_depth(key)
+            full_name = f"{sheetpile_type} {sheetpile_depth}m"
+            single_type_result['Depth'] = sheetpile_depth
+            single_type_result['Type'] = sheetpile_type
+            single_type_result['Total length'] = "{:.2f}".format(value)
+            gui_dict[full_name] = single_type_result
+
+        # 建立GUI
+        self.output_path = create_gui(gui_dict, "Sheet Pile Plan")
 
         # 把結果寫入xml檔案
         self.save_to_xml(final_respones)

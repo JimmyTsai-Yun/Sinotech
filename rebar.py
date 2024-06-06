@@ -71,6 +71,16 @@ class SheetPile_rebar(Base_rebar):
         
         # remove duplicated response
         response_list = list(set(response_list))
+        response_dic = {}
+        for pile_type in response_list:
+            single_type_result = {}
+            sheetpile_type, sheetpile_depth = extract_sheetpile_type_depth(pile_type)
+            single_type_result['Depth'] = sheetpile_depth
+            single_type_result['Type'] = sheetpile_type
+            full_name = f"{sheetpile_type} {sheetpile_depth}m"
+            response_dic[full_name] = single_type_result
+
+        self.output_path = create_gui(response_dic, "Sheet Pile Rebar")
 
         # write the response to xml file
         self.save_to_xml(response_list)
