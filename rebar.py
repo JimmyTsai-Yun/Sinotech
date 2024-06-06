@@ -130,6 +130,7 @@ class SheetPile_rebar(Base_rebar):
 
         return sheet_pile_type
 
+
 class BoredPile_rebar(Base_rebar):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -140,7 +141,7 @@ class BoredPile_rebar(Base_rebar):
         response_dic = {}
 
         # change pdf to images
-        imgs_list = pdf_to_images(self.pdf_path, dpi=300, output_folder="./", drawing_type="bored_pile-eval")
+        imgs_list = pdf_to_images(self.pdf_path, dpi=300, preprocess=False)
 
         # extract data from images
         for i, img in enumerate(imgs_list):
@@ -150,11 +151,14 @@ class BoredPile_rebar(Base_rebar):
             # add to the response_dic
             response_dic[type_name] = type_result
 
+        self.output_path = create_gui(response_dic, "Bored Pile Rebar")
+
         # write the response to xml file
         self.save_to_xml(response_dic)
 
     def save_to_xml(self, response_dic):
         print("資料萃取結果: ", response_dic)
+        print("已將資料寫入xml檔案: ", self.output_path)
         # 檢查是否已經有xml檔案，若有則讀取，若無則創建
         tree, root = create_or_read_xml(self.output_path)
         # 檢查是否有plans子節點，若無則創建，若有則刪除
@@ -165,34 +169,38 @@ class BoredPile_rebar(Base_rebar):
             # 移除plans的所有子節點
             for child in list(rebars):
                 rebars.remove(child)
-        
-        # 將response_dic寫入配筋圖子節點
-        for type_name, type_result in response_dic.items():
-            pile = ET.SubElement(rebars, 'WorkItemType', description="PILE", TYPE=type_name)
-            # 在pile底下建立TieBeam子節點
-            TieBeam = ET.SubElement(pile, 'TieBeam', description="繫樑")
-            TieBeam_value = ET.SubElement(TieBeam, 'Value')
-            TieBeam_value.text = str(type_result["TieBeam"])
-            # 在pile底下建立Diameter子節點
-            Diameter = ET.SubElement(pile, 'Diameter', description="直徑")
-            Diameter_value = ET.SubElement(Diameter, 'Value', unit="mm")
-            Diameter_value.text = str(type_result["diameter"])
-            # 在pile底下建立Depth子節點
-            Depth = ET.SubElement(pile, 'Depth', description="深度")
-            Depth_value = ET.SubElement(Depth, 'Value', unit="m")
-            Depth_value.text = str(type_result["depth"])
-            # 在pile底下建立ShearRebar子節點
-            ShearRebar = ET.SubElement(pile, 'ShearRebar', description="剪力筋")
-            ShearRebar_value = ET.SubElement(ShearRebar, 'Value')
-            ShearRebar_value.text = str(type_result["ShearRebar"])
-            # 在pile底下建立Stirrup子節點
-            Stirrup = ET.SubElement(pile, 'Stirrup', description="箍筋")
-            Stirrup_value = ET.SubElement(Stirrup, 'Value')
-            Stirrup_value.text = str(type_result["Stirrup"])
-            # 在pile底下建立ConcreteStrength子節點
-            ConcreteStrength = ET.SubElement(pile, 'ConcreteStrength', description="混凝土強度")
-            ConcreteStrength_value = ET.SubElement(ConcreteStrength, 'Value', unit="kgf/cm^2")
-            ConcreteStrength_value.text = str(type_result["ConcreteStrength"])
+        # 將response_list寫入配筋圖子節點
+        for pile_type, pile_info in response_dic.items():
+            pile = ET.SubElement(rebars, 'WorkItemType', description="PILE TYPE", TYPE=pile_type)
+            # 在pile底下建立Sheetpile子節點
+            for key, value in pile_info.items():
+                if key == "TieBeam":
+                    TieBeam_W = ET.SubElement(pile, 'TieBeam_W', description="繫樑寬")
+                    TieBeam_W_value = ET.SubElement(TieBeam_W, 'Value', unit="mm")
+                    TieBeam_W_value.text = str(value)
+                    TieBeam_H = ET.SubElement(pile, 'TieBeam_H', description="繫樑長")
+                    TieBeam_H_value = ET.SubElement(TieBeam_H, 'Value', unit="mm")
+                    TieBeam_H_value.text = str(value)
+                elif key == "diameter":
+                    diameter = ET.SubElement(pile, 'Diameter', description="直徑")
+                    diameter_value = ET.SubElement(diameter, 'Value', unit="mm")
+                    diameter_value.text = str(value)
+                elif key == "depth":
+                    depth = ET.SubElement(pile, 'Depth', description="深度")
+                    depth_value = ET.SubElement(depth, 'Value', unit="mm")
+                    depth_value.text = str(value)
+                elif key == "ShearRebar":
+                    ShearRebar = ET.SubElement(pile, 'ShearRebar', description="剪力筋")
+                    ShearRebar_value = ET.SubElement(ShearRebar, 'Value')
+                    ShearRebar_value.text = str(value)
+                elif key == "Stirrup":
+                    Stirrup = ET.SubElement(pile, 'Stirrup', description="箍筋")
+                    Stirrup_value = ET.SubElement(Stirrup, 'Value')
+                    Stirrup_value.text = str(value)
+                elif key == "ConcreteStrength":
+                    ConcreteStrength = ET.SubElement(pile, 'ConcreteStrength', description="混凝土強度")
+                    ConcreteStrength_value = ET.SubElement(ConcreteStrength, 'Value', unit="kgf/cm^2")
+                    ConcreteStrength_value.text = str(value)
         
         # 寫入xml檔案，utf-8編碼
         tree.write(self.output_path, encoding="utf-8")
@@ -211,8 +219,7 @@ class BoredPile_rebar(Base_rebar):
         }
 
         # image preprocessing
-        cv2_img = cv2.cvtColor(np.asarray(img),cv2.COLOR_RGB2BGR)
-        img_gray = cv2.cvtColor(cv2_img, cv2.COLOR_BGR2GRAY)
+        img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         _, img_th = cv2.threshold (img_gray, 240, 255, 0)
 
         # OCR

@@ -1,5 +1,5 @@
 from eval import SheetPile_eval, Diaphragm_eval
-from plan import Sheetpile_plan, Diaphragm_plan
+from plan import Sheetpile_plan, Diaphragm_plan, BoredPile_plan
 from rebar import SheetPile_rebar, Diaphragm_rebar, BoredPile_rebar
 from structure import Diaphragm_structure
 import sys
@@ -32,7 +32,7 @@ def main():
             "structure": Diaphragm_structure
         },
         "BoredPile":{
-            "plan": None,
+            "plan": BoredPile_plan,
             "rebar": BoredPile_rebar,
             "structure": None
         }

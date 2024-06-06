@@ -7,3 +7,18 @@
 *.csv
 # all the pycache
 __pycache__/
+
+# dcl directory
+dcl/
+
+# OCRmodel directory
+OCRmodel/
+
+# package directory
+package/
+
+# data directory
+data/
+
+# main.spec
+main.spec

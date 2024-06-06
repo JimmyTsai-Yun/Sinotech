@@ -5,6 +5,8 @@ from lib.utils import extract_sheetpile_type_depth
 # from lib.plans_utils import wall_line_detection, group_lines, segment_main_lines_with_labels, compute_wall_length
 from lib.plans_utils import sheetpile_plan_brute_force
 import keyboard
+import pandas as pd
+from scipy.spatial.distance import cdist
 
 # -------------------------------------------------------------------- #
 # The Base_plan class is a parent class that contains the common methods
@@ -158,6 +160,126 @@ class Sheetpile_plan(Base_plan):
             depth_value = ET.SubElement(depth, 'Value', unit="m")
             depth_value.text = str(sheetpile_depth)
 
+        # 將xml檔案寫入
+        tree.write(self.output_path, encoding="utf-8")
+
+# -------------------------------------------------------------------- #
+class BoredPile_plan(Base_plan):
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.ocr_tool = OCRTool(type='en')
+
+    def run(self):
+        response_dic = {}
+
+        img_lists = pdf_to_images(self.annotation_pdf_path, dpi=500, preprocess=False)
+
+        for i, img in enumerate(img_lists):
+            print(f"Processing image {i+1}/{len(img_lists)}")
+            type_name, type_result = self.extract_data(img)
+            response_dic[type_name] = type_result
+
+        self.output_path = create_gui(response_dic, "Bored Pile Plan")
+
+        self.save_to_xml(response_dic)
+
+    def extract_data(self, img):
+        # init the result dic
+        single_type_result = {
+            "type":None,
+            "count":'0',
+            "length":'0',
+            "diameter":'0'
+        }
+
+        # image preprocessing
+        img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        _, img_th = cv2.threshold(img_gray, 240, 255, 0)
+
+        # ocr
+        bounds = self.ocr_tool.ocr(img_th)
+
+        # get the type of the bored pile
+        for bound in bounds:
+            match = re.match(r'(\S+)cm(.*)BORED PILE TYPE (\S+)', bound[1])
+            if match:
+                diameter = re.sub(r'O', '0', match.group(1))
+                single_type_result["diameter"] = diameter
+                single_type_result["type"] = match.group(3)
+                break
+
+        # get the count of the bored pile and the length of the bored pile
+        csv_data = pd.read_csv(self.csv_path)
+
+        # Extract the coordinates
+        coordinates = csv_data[['位置 X', '位置 Y']].values
+
+        # Calculate the pairwise distances
+        distances = cdist(coordinates, coordinates, metric='euclidean')
+
+        # Initialize the path and visited nodes
+        n_points = len(coordinates)
+        visited = np.zeros(n_points, dtype=bool)
+        path = [0]  # Start from the first point
+        visited[0] = True
+
+        # Greedy algorithm to find the nearest neighbor path
+        for _ in range(1, n_points):
+            last_point = path[-1]
+            nearest_neighbor = np.argmin(distances[last_point, ~visited])
+            next_point = np.where(~visited)[0][nearest_neighbor]
+            path.append(next_point)
+            visited[next_point] = True
+        
+        # Add the first point at the end to complete the loop
+        path.append(path[0])
+
+        # Calculate the total length of the path
+        total_length = sum(
+            np.linalg.norm(coordinates[path[i]] - coordinates[path[i + 1]])
+            for i in range(n_points) if np.linalg.norm(coordinates[path[i]] - coordinates[path[i + 1]]) <= 4
+        )
+
+        single_type_result["count"] = str(n_points)
+        single_type_result["length"] = "{:.2f}".format(total_length)
+
+        return single_type_result["type"], single_type_result
+
+    def save_to_xml(self, response_dic):
+        print("資料萃取結果: ", response_dic)
+        print("已將資料寫入xml檔案: ", self.output_path)
+        # 檢查是否已經有xml檔案，若有則讀取，若無則創建
+        tree, root = create_or_read_xml(self.output_path)
+        # 檢查是否有plans子節點，若無則創建，若有則刪除
+        plans = root.find(".//Drawing[@description='平面圖']")
+        if plans is None:
+            plans = ET.SubElement(root, "Drawing", description='平面圖')
+        else:
+            # 移除plans的所有子節點
+            for child in list(plans):
+                plans.remove(child)
+        # 將response_list寫入平面圖子節點
+        for pile_type, pile_info in response_dic.items():
+            pile = ET.SubElement(plans, 'WorkItemType', description="PILE TYPE", TYPE=f"{pile_type}")
+            # 在 pile 底下建立BoredPile子節點
+            for key, value in pile_info.items():
+                if key == "type":
+                    type = ET.SubElement(pile, 'Type', description="型式")
+                    type_value = ET.SubElement(type, 'Value')
+                    type_value.text = value
+                elif key == "count":
+                    count = ET.SubElement(pile, 'Count', description="根樹")
+                    count_value = ET.SubElement(count, 'Value')
+                    count_value.text = value
+                elif key == "length":
+                    length = ET.SubElement(pile, 'Total', description="行進米")
+                    length_value = ET.SubElement(length, 'Value', unit="m")
+                    length_value.text = value
+                elif key == "diameter":
+                    diameter = ET.SubElement(pile, 'Diameter', description="樁徑")
+                    diameter_value = ET.SubElement(diameter, 'Value', unit="cm")
+                    diameter_value.text = value
+        
         # 將xml檔案寫入
         tree.write(self.output_path, encoding="utf-8")
 

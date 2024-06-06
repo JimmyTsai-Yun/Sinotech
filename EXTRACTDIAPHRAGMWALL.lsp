@@ -1,6 +1,6 @@
 ;------------------------------------------LOOP EVERY FILES------------------------------------------
 (defun wtype_selection ( / wtype)
-  (setq option '("Diaphragm" "SheetPile"))
+  (setq option '("Diaphragm" "SheetPile" "BoredPile"))
   (setq dcl_id (load_dialog "dcl\\dtype_selection.dcl"))
   (if (not (new_dialog "dtype_selection" dcl_id)) (exit))
   (start_list "selections")
@@ -2157,7 +2157,6 @@
 )
 ;------------------------------------------MAIN CODE TO BE RUNNING------------------------------------------
 (vl-load-com)
-(princ "Hello, this is the main code to be running")
 (setq oldpath (getvar "dwgprefix")) 
 (princ oldpath)
 (setq wtype (wtype_selection))
