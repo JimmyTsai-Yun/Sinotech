@@ -32,9 +32,9 @@ class OCRTool():
     def __init__(self, type="ch_tra"):
         """Initialize the OCR tool with the specified languages."""
         if type == "ch_tra":
-            self.reader = easyocr.Reader(['ch_tra', 'en'])
+            self.reader = easyocr.Reader(['ch_tra', 'en'], model_storage_directory='..\\.EasyOCR\\model')
         else:
-            self.reader = easyocr.Reader(['en'])
+            self.reader = easyocr.Reader(['en'], model_storage_directory='..\\.EasyOCR\\model')
         self.processing = False
 
     def ocr(self, img_gray):
@@ -77,7 +77,7 @@ Function to convert pdf to images,
 input is the path to the pdf file, output is a list of images
 '''
 def pdf_to_images(pdf_path, dpi=210, output_folder="./", drawing_type="sheet_pile-rebar", preprocess=True):
-    images = convert_from_path(pdf_path, dpi=dpi)
+    images = convert_from_path(pdf_path, dpi=dpi, poppler_path='..\poppler-24.02.0\\Library\\bin')
     imgs_list = []
     if not preprocess:
         for i, image in enumerate(images):
