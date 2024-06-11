@@ -6,6 +6,9 @@ from lib.utils import extract_sheetpile_type_depth
 from lib.plans_utils import sheetpile_plan_brute_force
 import keyboard
 import pandas as pd
+import numpy as np
+from scipy.spatial import KDTree
+from collections import Counter
 from scipy.spatial.distance import cdist
 
 # -------------------------------------------------------------------- #
@@ -219,37 +222,41 @@ class BoredPile_plan(Base_plan):
                 single_type_result["type"] = match.group(3)
                 break
 
-        # get the count of the bored pile and the length of the bored pile
-        csv_data = pd.read_csv(self.csv_path)
+        def find_most_common_distance(csv_file_path):
+            # 讀取 CSV 文件
+            data = pd.read_csv(csv_file_path)
 
-        # Extract the coordinates
-        coordinates = csv_data[['位置 X', '位置 Y']].values
-
-        # Calculate the pairwise distances
-        distances = cdist(coordinates, coordinates, metric='euclidean')
-
-        # Initialize the path and visited nodes
-        n_points = len(coordinates)
-        visited = np.zeros(n_points, dtype=bool)
-        path = [0]  # Start from the first point
-        visited[0] = True
-
-        # Greedy algorithm to find the nearest neighbor path
-        for _ in range(1, n_points):
-            last_point = path[-1]
-            nearest_neighbor = np.argmin(distances[last_point, ~visited])
-            next_point = np.where(~visited)[0][nearest_neighbor]
-            path.append(next_point)
-            visited[next_point] = True
+            # numbers of rows
+            number_of_rows = data.shape[0]
+            
+            # 檢查數據中是否存在 x_coor 和 y_coor 欄位
+            if 'x_coor' not in data.columns or 'y_coor' not in data.columns:
+                return "CSV 文件中必須包含 'x_coor' 和 'y_coor' 欄位。"
+            
+            # 建立 KDTree 用於快速尋找最近點
+            tree = KDTree(data[['x_coor', 'y_coor']])
+            
+            # 查詢最近的兩個鄰居的距離和索引
+            distances, _ = tree.query(data[['x_coor', 'y_coor']], k=3)
+            
+            # 提取最近和次近鄰居的距離
+            nearest_distances = distances[:, 1]
+            second_nearest_distances = distances[:, 2]
+            
+            # 結合所有距離
+            all_distances = np.concatenate((nearest_distances, second_nearest_distances))
+            
+            # 四捨五入距離以處理浮點數精確問題
+            rounded_distances = np.round(all_distances, decimals=3)
+            
+            # 使用 Counter 統計最常見的距離
+            distance_counts = Counter(rounded_distances)
+            most_common_distance, _ = distance_counts.most_common(1)[0]
+            
+            return number_of_rows, most_common_distance
         
-        # Add the first point at the end to complete the loop
-        path.append(path[0])
-
-        # Calculate the total length of the path
-        total_length = sum(
-            np.linalg.norm(coordinates[path[i]] - coordinates[path[i + 1]])
-            for i in range(n_points) if np.linalg.norm(coordinates[path[i]] - coordinates[path[i + 1]]) <= 4
-        )
+        n_points, most_common_distance = find_most_common_distance(self.csv_path)
+        total_length = n_points * most_common_distance
 
         single_type_result["count"] = str(n_points)
         single_type_result["length"] = "{:.2f}".format(total_length)
