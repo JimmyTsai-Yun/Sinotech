@@ -249,3 +249,120 @@ class Diaphragm_structure(Base_structure):
         self.call_ui(wall_strength1, wall_strength2, rebar_strength1, rebar_strength2)
 
         return
+    
+class BoredPile_structure(Base_structure):
+    """Derived class for specific operations on BoredPile structure drawings."""
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def re_match(self, string):
+        pattern = r'(\d+)\s*kgf/cm2'
+        match = re.search(pattern, string)
+        if match:
+            return int(match.group(1))
+        else:
+            return None
+
+    def extrct_data(self, bounds):
+
+        s_big_word = '直徑大於'
+        s_small_word = '直徑小於'
+        result_dic = {'Concrete':{'Strength1':0, 'Strength2':0},
+                          'Rebar':{'Strength1':0, 'Strength2':0}}
+
+        lengths_of_bounds = len(bounds)
+        
+        for i in range(lengths_of_bounds):
+            # check rebar strength 2
+            if bounds[i][1].find(s_big_word) > -1:
+                s_big_start = i
+                while True:
+                    if (bounds[s_big_start][1].upper()).find('KGF') > -1:
+                        result_dic["Rebar"]['Strength2'] = get_the_num(bounds[s_big_start][1])
+                        break  
+                    s_big_start += 1
+
+            # check rebar strength 1
+            if bounds[i][1].find(s_small_word) > -1:
+                s_small_start = i
+                while True:
+                    if (bounds[s_small_start][1].upper()).find('KGF') > -1:
+                        result_dic["Rebar"]['Strength1'] = get_the_num(bounds[s_small_start][1])
+                        break
+                    s_small_start += 1
+
+            # check wall strength1
+            if bounds[i][1].find('最小抗壓強度') > -1:
+                search_index = i
+                while True:
+                    if bounds[search_index][1].find('連續壁') > -1:
+                        check = self.re_match(bounds[search_index+1][1])
+                        if check:
+                            result_dic["Concrete"]['Strength1'] = check
+                            print(f'wall strength1: {result_dic["Concrete"]["Strength1"]}')
+                    if bounds[search_index][1].find('DIAPHRAGM WALLS') > -1:
+                        check = self.re_match(bounds[search_index+1][1])
+                        if check:
+                            result_dic["Concrete"]['Strength2'] = check
+                            print(f'wall strength2: {result_dic["Concrete"]["Strength2"]}')
+                        break
+                    search_index += 1
+
+        return result_dic
+    
+    def save_xml_file(self, result_dic):
+        print("The XML file has been saved at : " + str(self.output_path))
+        # 檢查是否已經有xml檔案，若有則讀取，若無則創建
+        tree, root = create_or_read_xml(self.output_path)
+        # 檢查是否有plans子節點，若無則創建，若有則刪除
+        structure = root.find(".//Drawing[@description='結構一般説明']")
+        if structure is None:
+            structure = ET.SubElement(root, "Drawing", description='結構一般説明')
+        else:
+            # 移除plans的所有子節點
+            for child in list(structure):
+                structure.remove(child)
+        # 將result_dic的資料寫入xml檔案
+        for strength_key, value in result_dic.items():
+            if strength_key == 'Concrete':
+                strength_type = ET.SubElement(structure, strength_key, description='混凝土')
+            else:
+                strength_type = ET.SubElement(structure, strength_key, description='鋼筋')
+            for k, v in value.items():
+                if k == 'Strength1':
+                    strength = ET.SubElement(strength_type, k, description='强度1')
+                    value = ET.SubElement(strength, 'Value', unit='kgf/cm2')
+                    value.text = str(v)
+                else:
+                    strength = ET.SubElement(strength_type, k, description='强度2')
+                    value = ET.SubElement(strength, 'Value', unit='kgf/cm2')
+                    value.text = str(v)
+        
+        # 將xml檔案寫入指定路徑
+        tree.write(self.output_path, encoding='utf-8', xml_declaration=True)
+
+        return
+    
+    def run(self):
+        try:
+            super().wait_pdf()
+
+            result_dic = {'Concrete Strength':{'strength1':0, 'strength2':0},
+                          'Rebar Strength':{'strength1':0, 'strength2':0}}
+
+            img_gray = super().pdf2img()
+
+            bounds = self.ocr_tool.ocr(img_gray)
+
+            result_dic = self.extrct_data(bounds)
+
+            self.output_path = create_gui(result_dic, 'BoredPile_structure')
+
+            self.save_xml_file(result_dic)
+
+            os.remove(self.pdf_path)
+
+        except Exception as e:
+            print(f"An error occurred: {e}")
+
+        return

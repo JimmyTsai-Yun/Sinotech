@@ -197,6 +197,11 @@ class BoredPile_plan(Base_plan):
 
         self.save_to_xml(response_dic)
 
+        os.remove(self.annotation_pdf_path)
+        os.remove(self.csv_path)
+
+        return
+
     def extract_data(self, img):
         # init the result dic
         single_type_result = {

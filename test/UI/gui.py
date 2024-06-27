@@ -62,6 +62,7 @@ def create_gui(data_dict, table_name):
 
             attr_entry = tk.Entry(attr_frame)
             attr_entry.insert(0, value)
+            attr_entry['state'] = 'readonly'  # 使輸入框變為只讀
             attr_entry.pack(side=tk.RIGHT, padx=5, pady=2)
         
         sub_canvas.bind('<Configure>', lambda e: sub_canvas.configure(scrollregion=sub_canvas.bbox("all")))
@@ -80,17 +81,13 @@ def create_gui(data_dict, table_name):
     return root.selected_file_path
 
 data = {
-    "carA": {"wheel": 4, "color": "red", "speed": 100, "weight": 1000, "price": 1000000, "brand": "Toyota", "model": "Camry", "year": 2020},
-    "carB": {"wheel": 4, "color": "red"},
-    "carc": {"wheel": 4, "color": "red"},
-    "card": {"wheel": 4, "color": "red"},
-    "carf": {"wheel": 4, "color": "red"},
-    "carg": {"wheel": 4, "color": "red"},
-    "cary": {"wheel": 4, "color": "red"},
-    "carg": {"wheel": 4, "color": "red"},
-    "carh": {"wheel": 4, "color": "red"},
+    "TypeT1": {"strength": 4200, "Depth": 18500, "Diameter": 800},
+    "TypeT2": {"strength": 4200, "Depth": 18500, "Diameter": 600},
+    "TypeT3": {"strength": 4200, "Depth": 18500, "Diameter": 800},
+    "TypeT4": {"strength": 4200, "Depth": 18500, "Diameter": 800},
+    "TypeT5": {"strength": 4200, "Depth": 18500, "Diameter": 800},
     # 可以添加更多的物體和屬性
 }
 
-file_path = create_gui(data, "Car Table")
+file_path = create_gui(data, "Bored Pile Table")
 print(f"Selected file path: {file_path}")

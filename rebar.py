@@ -166,6 +166,9 @@ class BoredPile_rebar(Base_rebar):
         # write the response to xml file
         self.save_to_xml(response_dic)
 
+        # remove the pdf
+        os.remove(self.pdf_path)
+
     def save_to_xml(self, response_dic):
         print("資料萃取結果: ", response_dic)
         print("已將資料寫入xml檔案: ", self.output_path)

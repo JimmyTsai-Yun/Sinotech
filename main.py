@@ -1,7 +1,7 @@
 from eval import SheetPile_eval, Diaphragm_eval
 from plan import Sheetpile_plan, Diaphragm_plan, BoredPile_plan
 from rebar import SheetPile_rebar, Diaphragm_rebar, BoredPile_rebar
-from structure import Diaphragm_structure
+from structure import Diaphragm_structure, BoredPile_structure
 import sys
 import os
 from argparse import ArgumentParser
@@ -34,7 +34,7 @@ def main():
         "BoredPile":{
             "plan": BoredPile_plan,
             "rebar": BoredPile_rebar,
-            "structure": None
+            "structure": BoredPile_structure
         }
     }
     
