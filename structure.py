@@ -300,7 +300,7 @@ class BoredPile_structure(Base_structure):
                         if check:
                             result_dic["Concrete"]['Strength1'] = check
                             print(f'wall strength1: {result_dic["Concrete"]["Strength1"]}')
-                    if bounds[search_index][1].find('DIAPHRAGM WALLS') > -1:
+                    if bounds[search_index][1].find('WALLS') > -1:
                         check = self.re_match(bounds[search_index+1][1])
                         if check:
                             result_dic["Concrete"]['Strength2'] = check

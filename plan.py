@@ -291,7 +291,7 @@ class BoredPile_plan(Base_plan):
                     type_value = ET.SubElement(type, 'Value')
                     type_value.text = value
                 elif key == "count":
-                    count = ET.SubElement(pile, 'Count', description="根樹")
+                    count = ET.SubElement(pile, 'Count', description="根數")
                     count_value = ET.SubElement(count, 'Value')
                     count_value.text = value
                 elif key == "length":

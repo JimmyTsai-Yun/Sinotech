@@ -1,27 +1,6 @@
+(load "utils.lsp")
 ;------------------------------------------LOOP EVERY FILES------------------------------------------
-(defun wtype_selection ( / wtype)
-  (setq option '("Diaphragm" "SheetPile" "BoredPile"))
-  (setq dcl_id (load_dialog "dcl\\dtype_selection.dcl"))
-  (if (not (new_dialog "dtype_selection" dcl_id)) (exit))
-  (start_list "selections")
-  (mapcar 'add_list option)
-  (end_list)
-  (action_tile "accept"
-  (strcat
-  "(progn"
-  "(setq selected_option (atof (get_tile \"selections\")))"
-  "(done_dialog) (setq userclick T))"
-  ))
-  (action_tile "cancel"
-  (strcat
-  "(quit)"
-  ))
-  (start_dialog)
-  (unload_dialog dcl_id)
-  (setq selected_option (fix selected_option))
-  (setq selected_option (nth selected_option option))
-  (setq wtype selected_option)
-)
+
 
 (defun dtype_selection ( / dtype)
   (setq option '("Plan Drawings" "Elevation Drawings" "Structural Descriptions" "Rebar Drawings"))
@@ -1918,6 +1897,35 @@
   )
   (command "-Publish" (strcat dirpath "\\" "PUBLIST_3.dsd") )
 )
+
+(defun output_pile_info(dirpath dwgname_list target_layer)
+  (setq wall_file (nth 0 target_layer))
+  (setq text_file (nth 1 target_layer))
+  (setq wall_layer (nth 2 target_layer))
+  (setq text_layer (nth 3 target_layer))
+  (setq pile_lst '(("x_coor" "y_coor")))
+
+  (while dwgname_list
+    (setq dwgname (car dwgname_list))
+    (vl-load-com)
+    (setq doc (vla-Open (vla-get-documents (vlax-get-acad-object)) (strcat dirpath "\\" dwgname)))
+    (vla-StartUndoMark doc)
+
+    (if (and (member dwgname wall_file) (member dwgname text_file))
+      (progn
+        (setq wall_file_index (vl-position dwgname wall_file))
+        (setq pile_lst (append pile_lst (extractpileinfo doc dwgname (nth wall_file_index wall_layer))))
+      )
+    )
+
+    (vla-purgeall doc)
+    (vla-EndUndoMark doc)
+    (vla-save doc)
+    (vla-close doc)
+    (setq dwgname_list (cdr dwgname_list))
+  )
+  (_writecsv "W" (strcat dirpath "\\pile.csv") pile_lst)
+)
 ;------------------------------------------LINE INFO EXTRACTION------------------------------------------
 (defun extractlineinfo ( doc dwgname target_layer_name / lst1 lst2)
   (setq lst1 '())
@@ -2032,6 +2040,39 @@
   )
   (setq lst1 (reverse lst1))
 )
+
+(defun extractpileinfo(doc dwgname target_layer_name / obj atts att)
+  (setq lst1 '())
+  (setq lst2 '())
+  (setq ss (vla-get-modelspace doc))
+  (while target_layer_name
+    (vlax-for obj ss 
+      (setq x (vlax-vla-object->ename obj))
+      ; (princ (strcat "val-get-layer" (vla-get-layer obj)))
+      ; (princ "\n")
+      (if 
+        (and
+        (= (vla-get-layer obj) (car target_layer_name))
+        (eq (vla-get-objectname obj) "AcDbBlockReference")  ; 檢查對象是否為圖塊引用
+        )
+        (progn
+          (setq atts (cdr (assoc 10 (entget x))))
+          ; store the first and second index of atts
+          (setq y_coor (nth 1 atts))
+          (setq lst2 (cons y_coor lst2))
+          (setq x_coor (nth 0 atts))
+          (setq lst2 (cons x_coor lst2))
+          (princ (strcat "x_coor: " (rtos x_coor 2 2) " y_coor: " (rtos y_coor 2 2) "\n"))
+          (setq lst1 (cons lst2 lst1))
+          (setq lst2 '())
+        )
+      )
+    )
+    (setq target_layer_name (cdr target_layer_name))  ; 將這一行移至 while 循環中正確的位置
+  )
+  (setq lst1 lst1)
+)
+
 
 ;----------------------------------------------FILTER LAYER----------------------------------------------
 (defun filterlayer (doc target_layer / layertable layer)
@@ -2157,8 +2198,7 @@
 )
 ;------------------------------------------MAIN CODE TO BE RUNNING------------------------------------------
 (vl-load-com)
-(setq oldpath (getvar "dwgprefix")) 
-(princ oldpath)
+(princ "Hello, this is the main code to be running")
 (setq wtype (wtype_selection))
 (setq dtype (dtype_selection))
 (setq cur_doc (vla-get-ActiveDocument (vlax-get-acad-object)))
@@ -2240,7 +2280,7 @@
 ; 鋼板樁平面圖
 (if (and (= dtype "Plan Drawings") (= wtype "SheetPile"))
   (progn
-    (setq dirpath (acet-ui-pickdir (strcat "Select the DIAPHRAGM WALL " (vl-princ-to-string dtype) " folder: ") 
+    (setq dirpath (acet-ui-pickdir (strcat "Select the Sheet Pile WALL " (vl-princ-to-string dtype) " folder: ") 
                 (getvar "dwgprefix")
               )) ;or write (getvar "dwgprefix")
     (setq dwgname_list (vl-directory-files dirpath "*.dwg" 1)) 
@@ -2292,7 +2332,53 @@
     (startapp command)
   )
 )
-
+; ------------------------------------------------For BoredPile ------------------------------------------------------
+(if (and (= dtype "Plan Drawings") (= wtype "BoredPile"))
+  (progn
+    (setq dirpath (acet-ui-pickdir (strcat "Select the Sheet Pile WALL " (vl-princ-to-string dtype) " folder: ") 
+                (getvar "dwgprefix")
+              )) ;or write (getvar "dwgprefix")
+    (setq dwgname_list (vl-directory-files dirpath "*.dwg" 1)) 
+    (setq target_file (vl-directory-files dirpath "*.dwg" 1))
+    (setq *layoutname_list* '())
+    (setq target_layer (preloop_for_selectlayer_folder dirpath dwgname_list))
+    (princ target_layer)
+    (setq wall_file (nth 0 target_layer))
+    (setq text_file (nth 1 target_layer))
+    (setq wall_layer (nth 2 target_layer))
+    (setq text_layer (nth 3 target_layer))
+    (output_pile_info dirpath target_file target_layer)
+    (publish_all_folder dirpath dwgname_list)
+  )
+)
+(if (and (= dtype "Rebar Drawings") (= wtype "BoredPile"))
+  (progn
+    (setq dirpath (acet-ui-pickdir (strcat "Select the Bored Pile " (vl-princ-to-string dtype) " folder: ") 
+                (getvar "dwgprefix")
+              ))
+    (setq dwgname_list (vl-directory-files dirpath "*.dwg" 1)) 
+    (setq target_file (vl-directory-files dirpath "*.dwg" 1))
+    (setq *layoutname_list* '())
+    (preloopp_for_all_folder dirpath dwgname_list)
+    (publish_all_folder dirpath dwgname_list)
+    ; (setq command (strcat "dist\\main.exe -t BoredPile -d rebar -p " dirpath "\\-Layout1.pdf"))
+    ; (startapp command)
+  )
+)
+(if (and (= dtype "Structural Descriptions") (= wtype "BoredPile"))
+  (progn
+    (command "BACKGROUNDPLOT" 2)
+    (setq *temp* (getfiled (strcat "Select the DIAPHRAGM WALL " (vl-princ-to-string dtype) " folder") "" "dwg" 8))
+    (setq filepath *temp*)
+    (setq filepath2 *temp*)
+    (setq dirpath (substr *temp* 1 (vl-string-position (ascii "\\") *temp* nil t)))
+    (setq filename (list (vl-string-left-trim dirpath *temp*)))
+    (setq *layoutname_list* '())
+    (mainloop3 filepath dirpath filename)
+    (command "BACKGROUNDPLOT" 0)
+    (startapp "dist\\Data Process - Structural Descriptions.exe" dirpath)
+  )
+)
 (command "FILEDIA" OldFda)
 (command "BACKGROUNDPLOT" OldBgp)
 (command "LAYEREVALCTL" OldLayEva)

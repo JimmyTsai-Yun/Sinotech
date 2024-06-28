@@ -14,6 +14,12 @@ dcl/
 # OCRmodel directory
 OCRmodel/
 
+# .EasyOCR directory
+.EasyOCR/
+
+# poppler directory
+poppler-24.02.0/
+
 # package directory
 package/
 
@@ -23,5 +29,5 @@ data/
 # main.spec
 main.spec
 
-# dcl directory
-dcl/
+# dist directory
+dist/
