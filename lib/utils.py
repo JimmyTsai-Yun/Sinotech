@@ -3,6 +3,7 @@ import numpy as np
 from pdf2image import convert_from_path
 import easyocr
 import os
+import sys
 import copy
 from dotenv import load_dotenv, find_dotenv
 from openai import AzureOpenAI
@@ -20,20 +21,42 @@ import threading
 import time
 import re
 
+def set_working_directory():
+    # 當程式被 PyInstaller 打包時
+    if hasattr(sys, '_MEIPASS'):
+        # 設置工作目錄為可執行文件所在的目錄
+        exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+    else:
+        # 當程式在開發環境中執行時
+        exe_dir = os.path.dirname(os.path.abspath(__file__))
+        # 回到上一層目錄，即專案根目錄
+        exe_dir = os.path.dirname(exe_dir)
+
+    # 設置工作目錄為可執行文件所在的目錄
+    os.chdir(exe_dir)
+
+    return os.getcwd()
+
 '''
 Construct easyocr reader object
 '''
 def construct_easyocr_reader():
-    reader = easyocr.Reader(['en'])
+    cwd = set_working_directory()
+    parent_dir = os.path.dirname(cwd)
+    model_path = os.path.join(parent_dir, '.EasyOCR\\model')
+    reader = easyocr.Reader(['en'], model_storage_directory=model_path)
     return reader
 
 class OCRTool():
     def __init__(self, type="ch_tra"):
+        cwd = set_working_directory()
+        parent_dir = os.path.dirname(cwd)
+        model_path = os.path.join(parent_dir, '.EasyOCR\\model')
         """Initialize the OCR tool with the specified languages."""
         if type == "ch_tra":
-            self.reader = easyocr.Reader(['ch_tra', 'en'], model_storage_directory='..\\.EasyOCR\\model')
+            self.reader = easyocr.Reader(['ch_tra', 'en'], model_storage_directory=model_path)
         else:
-            self.reader = easyocr.Reader(['en'], model_storage_directory='..\\.EasyOCR\\model')
+            self.reader = easyocr.Reader(['en'], model_storage_directory=model_path)
         self.processing = False
 
     def ocr(self, img_gray):
@@ -76,7 +99,10 @@ Function to convert pdf to images,
 input is the path to the pdf file, output is a list of images
 '''
 def pdf_to_images(pdf_path, dpi=210, output_folder="./", drawing_type="sheet_pile-rebar", preprocess=True):
-    images = convert_from_path(pdf_path, dpi=dpi, poppler_path='..\\poppler-24.02.0\\Library\\bin')
+    cwd = set_working_directory()
+    parent_dir = os.path.dirname(cwd)
+    poppler_path = os.path.join(parent_dir, 'poppler-24.02.0\\Library\\bin')
+    images = convert_from_path(pdf_path, dpi=dpi, poppler_path=poppler_path)
     imgs_list = []
     if not preprocess:
         for i, image in enumerate(images):
@@ -96,7 +122,10 @@ def pdf_to_images(pdf_path, dpi=210, output_folder="./", drawing_type="sheet_pil
     return imgs_list
 
 def pdf2images(pdf_path, dpi=210):
-    images = convert_from_path(pdf_path, dpi=dpi,  poppler_path='..\\poppler-24.02.0\\Library\\bin')
+    cwd = set_working_directory()
+    parent_dir = os.path.dirname(cwd)
+    poppler_path = os.path.join(parent_dir, 'poppler-24.02.0\\Library\\bin')
+    images = convert_from_path(pdf_path, dpi=dpi,  poppler_path=poppler_path)
     imgs_list = []
     for image in images:
         np_img = np.array(image)
