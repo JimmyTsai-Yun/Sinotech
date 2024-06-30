@@ -116,6 +116,18 @@
   (princ)
 )
 
+(defun set-layout-plotter-config (doc layout-name config-name)
+  (setq layouts (vla-get-Layouts doc))
+  (setq layout (vla-Item layouts layout-name))
+  (if (or (equal (vla-get-configname layout) "None") (equal (vla-get-configname layout) "無"))
+    (progn
+    (vla-put-ConfigName layout config-name) ;config-name = AutoCAD PDF (General Documentation).pc3
+    (vla-put-CanonicalMediaName layout "ISO_full_bleed_A3_(297.00_x_420.00_MM)") ;paper size
+    (prompt (strcat "\nThe plotter configuration for layout '" layout-name "' has been set to '" config-name "'."))
+    )
+  )
+)
+
 ;---------------- Function to export data to CSV ------------------------
 (defun _writecsv (method fn lst / f)
     (cond ((and (eq 'str (type fn)) (setq f (open fn method)))
@@ -187,4 +199,28 @@
     (setq dwgname_list (cdr dwgname_list))
   )
   (command "-Publish" (strcat dirpath "\\" dsd_path) )
+)
+
+; ---------------- Some basic functions ---------------------------------
+(defun RemoveNth ( n l )
+    (if (and l (< 0 n))
+        (cons (car l) (RemoveNth (1- n) (cdr l)))
+        (cdr l)
+    )
+)
+(defun SubstNth ( a n l / i )
+    (setq i -1)
+    (mapcar '(lambda ( x ) (if (= (setq i (1+ i)) n) a x)) l)
+)
+(defun dclist ( key lst )
+    (start_list key)
+    (foreach itm lst (add_list itm))
+    (end_list)
+)
+(defun shiftitems ( idx lb1 lb2 / int )
+    (setq int -1
+          lb2 (reverse lb2)
+          lb1 (vl-remove-if '(lambda ( x ) (if (member (setq int (1+ int)) idx) (setq lb2 (cons x lb2)))) lb1)
+    )
+    (list lb1 (reverse lb2))
 )
