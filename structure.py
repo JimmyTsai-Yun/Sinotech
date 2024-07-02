@@ -5,6 +5,7 @@ import tkinter as tk
 from tkinter import filedialog
 from pathlib import Path
 import os
+import cv2
 
 class Base_structure():
     def __init__(self, **kwargs):
@@ -31,12 +32,6 @@ class Base_structure():
             loader.stop()
         except Exception as e:
             print(f"Error during PDF wait: {e}")
-
-    def pdf2img(self):
-        """Convert a PDF file to images."""
-        images = convert_from_path(self.pdf_path, dpi=300)
-        img_gray = cv2.cvtColor(np.array(images[0]), cv2.COLOR_BGR2GRAY)
-        return img_gray
 
 
 class Diaphragm_structure(Base_structure):
@@ -232,7 +227,7 @@ class Diaphragm_structure(Base_structure):
         try:
             super().wait_pdf()
 
-            img_gray = super().pdf2img()
+            img_gray = pdf_to_images(self.pdf_path, dpi=300, preprocess=False)[0]
             if self.use_azure:
                 pass
             else:
@@ -279,6 +274,7 @@ class BoredPile_structure(Base_structure):
                 while True:
                     if (bounds[s_big_start][1].upper()).find('KGF') > -1:
                         result_dic["Rebar"]['Strength2'] = get_the_num(bounds[s_big_start][1])
+                        print(f'rebar strength 1: {result_dic["Rebar"]["Strength2"]}')
                         break  
                     s_big_start += 1
 
@@ -288,6 +284,7 @@ class BoredPile_structure(Base_structure):
                 while True:
                     if (bounds[s_small_start][1].upper()).find('KGF') > -1:
                         result_dic["Rebar"]['Strength1'] = get_the_num(bounds[s_small_start][1])
+                        print(f'rebar strength 2: {result_dic["Rebar"]["Strength1"]}')
                         break
                     s_small_start += 1
 
@@ -350,7 +347,9 @@ class BoredPile_structure(Base_structure):
             result_dic = {'Concrete Strength':{'strength1':0, 'strength2':0},
                           'Rebar Strength':{'strength1':0, 'strength2':0}}
 
-            img_gray = super().pdf2img()
+            img_rgb  = pdf_to_images(self.pdf_path, dpi=300, preprocess=False)[0]
+
+            img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_BGR2GRAY)
 
             bounds = self.ocr_tool.ocr(img_gray)
 
