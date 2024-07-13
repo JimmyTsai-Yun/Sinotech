@@ -151,28 +151,28 @@ class Sheetpile_plan(Base_plan):
         plans = root.find(".//Drawing[@description='平面圖']")
         if plans is None:
             plans = ET.SubElement(root, "Drawing", description='平面圖')
-        else:
-            # 移除plans的所有子節點
-            for child in list(plans):
-                plans.remove(child)
+
         # 將response_list寫入平面圖子節點
         for key, value in response_dic.items():
             sheetpile_type, sheetpile_depth = extract_sheetpile_type_depth(key)
-            pile = ET.SubElement(plans, 'WorkItemType', description="DEPTH", DEPTH=f"Depth {str(sheetpile_depth)}m")
-            # 在 pile 底下建立Sheetpile子節點
-            sheetpile = ET.SubElement(pile, 'Sheetpile', description="鋼板樁")
-            # 在 sheetpile 底下建立type子節點
-            type = ET.SubElement(sheetpile, 'Type', description="鋼板樁型號")
-            type_value = ET.SubElement(type, 'Value')
-            type_value.text = sheetpile_type
-            # 在 sheetpile 底下建立length子節點
-            length = ET.SubElement(sheetpile, 'Total', description="鋼板樁行進米")
-            length_value = ET.SubElement(length, 'Value', unit="m")
-            length_value.text = str(value)
-            # 在 sheetpile 底下建立height子節點
-            depth = ET.SubElement(sheetpile, 'Height', description="鋼板樁深度")
-            depth_value = ET.SubElement(depth, 'Value', unit="m")
-            depth_value.text = str(sheetpile_depth)
+            if check_attribute_exists(plans, 'DEPTH', f"Depth {str(sheetpile_depth)}m"):
+                continue
+            else:
+                pile = ET.SubElement(plans, 'WorkItemType', description="DEPTH", DEPTH=f"Depth {str(sheetpile_depth)}m")
+                # 在 pile 底下建立Sheetpile子節點
+                sheetpile = ET.SubElement(pile, 'Sheetpile', description="鋼板樁")
+                # 在 sheetpile 底下建立type子節點
+                type = ET.SubElement(sheetpile, 'Type', description="鋼板樁型號")
+                type_value = ET.SubElement(type, 'Value')
+                type_value.text = sheetpile_type
+                # 在 sheetpile 底下建立length子節點
+                length = ET.SubElement(sheetpile, 'Total', description="鋼板樁行進米")
+                length_value = ET.SubElement(length, 'Value', unit="m")
+                length_value.text = str(value)
+                # 在 sheetpile 底下建立height子節點
+                depth = ET.SubElement(sheetpile, 'Height', description="鋼板樁深度")
+                depth_value = ET.SubElement(depth, 'Value', unit="m")
+                depth_value.text = str(sheetpile_depth)
 
         # 將xml檔案寫入
         tree.write(self.output_path, encoding="utf-8")
@@ -277,32 +277,32 @@ class BoredPile_plan(Base_plan):
         plans = root.find(".//Drawing[@description='平面圖']")
         if plans is None:
             plans = ET.SubElement(root, "Drawing", description='平面圖')
-        else:
-            # 移除plans的所有子節點
-            for child in list(plans):
-                plans.remove(child)
+        
         # 將response_list寫入平面圖子節點
         for pile_type, pile_info in response_dic.items():
-            pile = ET.SubElement(plans, 'WorkItemType', description="PILE TYPE", TYPE=f"{pile_type}")
-            # 在 pile 底下建立 RowPile 子節點
-            rowpile = ET.SubElement(pile, 'RowPile', description="排樁")
-            for key, value in pile_info.items():
-                if key == "type":
-                    type = ET.SubElement(rowpile, 'Type', description="型式")
-                    type_value = ET.SubElement(type, 'Value')
-                    type_value.text = value
-                elif key == "count":
-                    count = ET.SubElement(rowpile, 'Count', description="根數")
-                    count_value = ET.SubElement(count, 'Value')
-                    count_value.text = value
-                elif key == "length":
-                    length = ET.SubElement(rowpile, 'Total', description="行進米")
-                    length_value = ET.SubElement(length, 'Value', unit="m")
-                    length_value.text = value
-                elif key == "diameter":
-                    diameter = ET.SubElement(rowpile, 'Diameter', description="樁徑")
-                    diameter_value = ET.SubElement(diameter, 'Value', unit="cm")
-                    diameter_value.text = value
+            if check_attribute_exists(plans, 'TYPE', f"{pile_type}"):
+                continue
+            else:
+                pile = ET.SubElement(plans, 'WorkItemType', description="PILE TYPE", TYPE=f"{pile_type}")
+                # 在 pile 底下建立 RowPile 子節點
+                rowpile = ET.SubElement(pile, 'RowPile', description="排樁")
+                for key, value in pile_info.items():
+                    if key == "type":
+                        type = ET.SubElement(rowpile, 'Type', description="型式")
+                        type_value = ET.SubElement(type, 'Value')
+                        type_value.text = value
+                    elif key == "count":
+                        count = ET.SubElement(rowpile, 'Count', description="根數")
+                        count_value = ET.SubElement(count, 'Value')
+                        count_value.text = value
+                    elif key == "length":
+                        length = ET.SubElement(rowpile, 'Total', description="行進米")
+                        length_value = ET.SubElement(length, 'Value', unit="m")
+                        length_value.text = value
+                    elif key == "diameter":
+                        diameter = ET.SubElement(rowpile, 'Diameter', description="樁徑")
+                        diameter_value = ET.SubElement(diameter, 'Value', unit="cm")
+                        diameter_value.text = value
         
         # 將xml檔案寫入
         tree.write(self.output_path, encoding="utf-8")

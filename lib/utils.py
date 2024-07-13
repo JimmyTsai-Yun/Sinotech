@@ -507,3 +507,16 @@ def create_gui(data_dict, table_name):
     window.mainloop()
 
     return window.selected_file_path
+
+def check_attribute_exists(element, attribute_name, attribute_value):
+    """
+    檢查給定元素下是否存在具有特定屬性和值的節點。
+
+    :param element: 要檢查的 XML 元素
+    :param attribute_name: 要查找的屬性名稱
+    :param attribute_value: 要查找的屬性值
+    :return: 如果找到匹配的節點則返回 True，否則返回 False
+    """
+    xpath = f".//*[@{attribute_name}='{attribute_value}']"
+    existing_item = element.find(xpath)
+    return existing_item is not None
