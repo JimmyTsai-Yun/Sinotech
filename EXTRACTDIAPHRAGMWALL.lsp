@@ -1440,6 +1440,8 @@
       (progn
       (setq *layoutname_list* (append *layoutname_list* (list (vla-get-Name layout))))
       (set-layout-plotter-config doc (vla-get-Name layout) "AutoCAD PDF (General Documentation).pc3")
+      (princ (strcat "Layout1 / 配置1 is found in " ", exporting the pdf"))
+      (vla-put-StyleSheet layout "")
       (setq exportable  "True")
       )
     )

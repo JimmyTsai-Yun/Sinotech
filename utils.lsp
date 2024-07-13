@@ -150,6 +150,7 @@
 (defun turnon_alllayer (doc / layertable layer)
   (setq layertable (vla-get-layers doc))
   (vlax-for layer layertable
+      (vla-put-LayerOn layer :vlax-true)  ; 設置圖層為可打印
       (vla-put-plottable layer :vlax-true)
   )
 )
