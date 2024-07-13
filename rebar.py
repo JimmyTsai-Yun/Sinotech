@@ -112,7 +112,7 @@ class SheetPile_rebar(Base_rebar):
             type_value = ET.SubElement(type, 'Value')
             type_value.text = sheetpile_type
             # 在type底下建立height子節點
-            depth = ET.SubElement(sheetpile, 'Depth', description="鋼板樁深度")
+            depth = ET.SubElement(sheetpile, 'Height', description="鋼板樁深度")
             depth_value = ET.SubElement(depth, 'Value', unit="m")
             depth_value.text = str(sheetpile_depth)
         
@@ -185,33 +185,38 @@ class BoredPile_rebar(Base_rebar):
         # 將response_list寫入配筋圖子節點
         for pile_type, pile_info in response_dic.items():
             pile = ET.SubElement(rebars, 'WorkItemType', description="PILE TYPE", TYPE=pile_type)
-            # 在pile底下建立Sheetpile子節點
+            # 在 pile 底下建立 Rowpile 子節點
+            Rowpile = ET.SubElement(pile, 'Rowpile', description="排樁")
+            # 在 pile 底下建立 eam子 節點
+            Beam = ET.SubElement(pile, 'Beam', description="繫樑")
             for key, value in pile_info.items():
                 if key == "TieBeam":
-                    TieBeam_W = ET.SubElement(pile, 'TieBeam_W', description="繫樑寬")
+                    TieBeam_W = ET.SubElement(Beam, 'Width', description="繫樑寬")
                     TieBeam_W_value = ET.SubElement(TieBeam_W, 'Value', unit="mm")
                     TieBeam_W_value.text = str(value)
-                    TieBeam_H = ET.SubElement(pile, 'TieBeam_H', description="繫樑長")
+                    TieBeam_H = ET.SubElement(Beam, 'Length', description="繫樑長")
                     TieBeam_H_value = ET.SubElement(TieBeam_H, 'Value', unit="mm")
                     TieBeam_H_value.text = str(value)
                 elif key == "diameter":
-                    diameter = ET.SubElement(pile, 'Diameter', description="直徑")
+                    diameter = ET.SubElement(Rowpile, 'Diameter', description="直徑")
                     diameter_value = ET.SubElement(diameter, 'Value', unit="mm")
                     diameter_value.text = str(value)
                 elif key == "depth":
-                    depth = ET.SubElement(pile, 'Depth', description="深度")
+                    depth = ET.SubElement(Rowpile, 'Height', description="深度")
                     depth_value = ET.SubElement(depth, 'Value', unit="mm")
                     depth_value.text = str(value)
                 elif key == "ShearRebar":
-                    ShearRebar = ET.SubElement(pile, 'ShearRebar', description="剪力筋")
+                    ShearRebar = ET.SubElement(Rowpile, 'ShearRebar', description="剪力筋")
                     ShearRebar_value = ET.SubElement(ShearRebar, 'Value')
                     ShearRebar_value.text = str(value)
                 elif key == "Stirrup":
-                    Stirrup = ET.SubElement(pile, 'Stirrup', description="箍筋")
+                    Stirrup = ET.SubElement(Rowpile, 'Stirrup', description="箍筋")
                     Stirrup_value = ET.SubElement(Stirrup, 'Value')
                     Stirrup_value.text = str(value)
                 elif key == "ConcreteStrength":
-                    ConcreteStrength = ET.SubElement(pile, 'ConcreteStrength', description="混凝土強度")
+                    # 在 Rowpile 底下建立 Concrete 子節點
+                    Concrete = ET.SubElement(Rowpile, 'Concrete', description="混凝土")
+                    ConcreteStrength = ET.SubElement(Concrete, 'Strength', description="混凝土強度")
                     ConcreteStrength_value = ET.SubElement(ConcreteStrength, 'Value', unit="kgf/cm^2")
                     ConcreteStrength_value.text = str(value)
         

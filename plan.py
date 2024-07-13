@@ -170,7 +170,7 @@ class Sheetpile_plan(Base_plan):
             length_value = ET.SubElement(length, 'Value', unit="m")
             length_value.text = str(value)
             # 在 sheetpile 底下建立height子節點
-            depth = ET.SubElement(sheetpile, 'Depth', description="鋼板樁深度")
+            depth = ET.SubElement(sheetpile, 'Height', description="鋼板樁深度")
             depth_value = ET.SubElement(depth, 'Value', unit="m")
             depth_value.text = str(sheetpile_depth)
 
@@ -284,22 +284,23 @@ class BoredPile_plan(Base_plan):
         # 將response_list寫入平面圖子節點
         for pile_type, pile_info in response_dic.items():
             pile = ET.SubElement(plans, 'WorkItemType', description="PILE TYPE", TYPE=f"{pile_type}")
-            # 在 pile 底下建立BoredPile子節點
+            # 在 pile 底下建立 RowPile 子節點
+            rowpile = ET.SubElement(pile, 'RowPile', description="排樁")
             for key, value in pile_info.items():
                 if key == "type":
-                    type = ET.SubElement(pile, 'Type', description="型式")
+                    type = ET.SubElement(rowpile, 'Type', description="型式")
                     type_value = ET.SubElement(type, 'Value')
                     type_value.text = value
                 elif key == "count":
-                    count = ET.SubElement(pile, 'Count', description="根數")
+                    count = ET.SubElement(rowpile, 'Count', description="根數")
                     count_value = ET.SubElement(count, 'Value')
                     count_value.text = value
                 elif key == "length":
-                    length = ET.SubElement(pile, 'Total', description="行進米")
+                    length = ET.SubElement(rowpile, 'Total', description="行進米")
                     length_value = ET.SubElement(length, 'Value', unit="m")
                     length_value.text = value
                 elif key == "diameter":
-                    diameter = ET.SubElement(pile, 'Diameter', description="樁徑")
+                    diameter = ET.SubElement(rowpile, 'Diameter', description="樁徑")
                     diameter_value = ET.SubElement(diameter, 'Value', unit="cm")
                     diameter_value.text = value
         

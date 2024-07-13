@@ -134,7 +134,7 @@ class SheetPile_eval(Base_eval):
             type_value = ET.SubElement(type, 'Value')
             type_value.text = sheetpile_type
             # 在type底下建立height子節點
-            depth = ET.SubElement(sheetpile, 'Depth', description="鋼板樁深度")
+            depth = ET.SubElement(sheetpile, 'Height', description="鋼板樁深度")
             depth_value = ET.SubElement(depth, 'Value', unit="m")
             depth_value.text = str(sheetpile_depth)
             
