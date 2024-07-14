@@ -288,7 +288,7 @@ for i in tqdm(range(len(imgs))):
 
   # ocr
   bounds = reader.readtext(imgs[i], detail=1)
-  array = np.array(bounds)
+#   array = np.array(bounds)
 
   for bound in bounds:
     try:
@@ -332,13 +332,14 @@ for i in tqdm(range(len(imgs))):
 
   # pairing arrow and word
   check = []
-  for j in range(len(array[:,1])):
-    if (array[j,1].upper()).find('PE') > -1:
+#   for j in range(len(bounds[:,1])): 原本的code
+  for j in range(len(bounds)):
+    if (bounds[j][1].upper()).find('PE') > -1:
       check.append(j)
   pair = np.zeros((len(check),2))
 
   for count,i in enumerate(check):
-    p0, p1, p2, p3 = array[i,0]
+    p0, p1, p2, p3 = bounds[i][0]
     dis = 10000000000
     for k in check_arrow:                                   #### 3. and this line 
       x,y,w,h = cv2.boundingRect(contours_a[k])                 
@@ -350,7 +351,7 @@ for i in tqdm(range(len(imgs))):
   # store wall type
   wall_type = []
   for i in check:
-    string = array[i,1]
+    string = bounds[i][1]
     for j,k in enumerate(string):
       if k == ' ' :
         want_string = string[j+1:len(string)]
@@ -361,7 +362,7 @@ for i in tqdm(range(len(imgs))):
 
     word = int(i[0])
     arrow  = int(i[1])
-    p0, p1, p2, p3 = array[word,0]
+    p0, p1, p2, p3 = bounds[word][0]
     x,y,w,h = cv2.boundingRect(contours_a[arrow])
 
     lss = [x, y, x+w, y+h, p0[0], p0[1], p2[0], p2[1], wall_type[index]]
@@ -684,27 +685,21 @@ for drawings_number in range(0,len(dwgfile)):
                 pass
 wall_type_color_check.sort(key=lambda x: (x is not None, str(x) if x is not None else ""))
 
-def save_xml_file():
-    global downloads_path, xmlfname, all_wall_thickness, all_wall_height
+import xml.etree.ElementTree as ET
+from lib.utils import create_or_read_xml, check_attribute_exists
+def save_xml_file(file_path):
+    global all_wall_thickness, all_wall_height
 
-    file_path = filedialog.askdirectory( title='Please choose the save location for the XML file.',initialdir=downloads_path)
+    tree, root = create_or_read_xml(file_path)
 
-    try:
-        downloads_path = file_path
-        xmlfname = os.path.join(downloads_path, "Result.xml")
-        print("The XML file has been saved at : " + str(xmlfname))
-    except Exception as e:
-        print(f"Error: {e}")
-        downloads_path = str(Path.home() / "Downloads")
-        xmlfname = os.path.join(downloads_path, "Result.xml")
-        print("The XML file will be saved at the default location : " + str(xmlfname))
+    # 檢查是否有plans子節點，若無則創建，若有則刪除
+    evals = root.find(".//Drawing[@description='立面圖']")
+    if evals is None:
+        evals = ET.SubElement(root, "Drawing", description="立面圖")
 
     all_wall_type= list(set(all_wall_thickness.keys()) | set(all_wall_height.keys()))
     all_wall_type=sorted(all_wall_type, key=lambda x: (x is None, x or float('inf')))
 
-    xml_out_DD = open(xmlfname, 'ab')
-    xml_out_DD.write(bytes('<WorkItem><File Description="設計圖說">', 'utf-8'))
-    xml_out_DD.write(bytes('<Drawing Description="立面圖">', 'utf-8'))
     for type in all_wall_type:
         try:
             depth = all_wall_height[type]
@@ -714,58 +709,42 @@ def save_xml_file():
             thickness = all_wall_thickness[type]
         except:
             thickness=[0]
-        if depth==[0] and thickness==[0]:continue
-        xml_out_DD.write(bytes("""
-        <WorkItemType Description="TYPE """+str(type)+"""">
-        <Concrete>
-        <Strength Description="混凝土強度" >
-        <Value unit="kgf/cm^2" />
-        </Strength>
-        <Total Description="數量" >
-        <Value unit="m2" />
-        </Total>
-        <Length Description="設計長度" >
-        <Value unit="m" />
-        </Length>
-        <Depth Description="設計深度" >
-        <Value unit="m" >"""+str(depth)[1:-1]+"""</Value>
-        </Depth>
-        <Thickness Description="厚度" >
-        <Value unit="m" >"""+str(thickness)[1:-1]+"""</Value>
-        </Thickness>
-        </Concrete>
-        </WorkItemType>""", 'utf-8'))
+        if depth==[0] and thickness==[0]:
+            continue
 
-    xml_out_DD.write(bytes('</Drawing></File></WorkItem>', 'utf-8'))
-    xml_out_DD.close()   
+        if check_attribute_exists(evals, "description", "TYPE "+str(type)):
+            continue
 
-    #Remove Double in XML
-    with open(xmlfname, 'rb') as f:
-        lines = f.readlines()
-        target=bytes('</File></WorkItem><WorkItem><File Description="設計圖說">', 'utf-8')
-        repget_head=bytes('<Drawing Description="立面圖">', 'utf-8')
-        repget_tail=bytes('</Drawing>', 'utf-8')
-        repget_count=[]
-        for i,iitem in enumerate(lines):
-            target_pos=[]
-            target_pos=iitem.find(target)
-            if repget_tail in iitem and len(repget_count)>0:
-                repget_count[-1].append(i)
-            if repget_head in iitem:
-                repget_count.append([i])
-            if target_pos!=-1:
-                lines[i]=lines[i][:target_pos]+lines[i][target_pos+len(target):]
-        for i,iitem in enumerate(repget_count[:-1]):
-            head_pos=lines[iitem[0]].find(repget_head)
-            tail_pos=lines[iitem[1]].find(repget_tail)
-            lines[iitem[0]]=lines[iitem[0]][:head_pos]
-            lines[iitem[1]]=lines[iitem[1]][tail_pos+len(repget_tail):]
-            del lines[iitem[0]+1:iitem[1]]
+        # create a new WorkItemType element
+        WorkItemType = ET.SubElement(evals, "WorkItemType", description="TYPE "+str(type))
+            # Create a new DiaphragmWall element
+        DiaphragmWall = ET.SubElement(WorkItemType, "DiaphragmWall", description="連續壁")
+            # Create a new Concrete element
+        concrete = ET.SubElement(DiaphragmWall, "Concrete")
+                    # Create a new Strength element
+        strength = ET.SubElement(concrete, "Strength", description="混凝土強度")
+        strength_value = ET.SubElement(strength, "Value", unit="kgf/cm^2")
+                    # Create a new Total element
+        total = ET.SubElement(concrete, "Total", description="數量")
+        total_value = ET.SubElement(total, "Value", unit="m2")
+                # Create a new Length element
+        length_element = ET.SubElement(DiaphragmWall, "Length", description="行進米")
+        length_value = ET.SubElement(length_element, "Value", unit="m")
+                # Create a new Depth element
+        depth_element = ET.SubElement(DiaphragmWall, "Depth", description="設計深度")
+        depth_value = ET.SubElement(depth_element, "Value", unit="m")
+        depth_value.text = str(depth)[1:-1]
+                # Create a new Thickness element
+        thickness_element = ET.SubElement(DiaphragmWall, "Thickness", description="厚度")
+        thickness_value = ET.SubElement(thickness_element, "Value", unit="m")
+        thickness_value.text = str(thickness)[1:-1]
 
-    xml_out_DDD = open(xmlfname, 'wb')
-    for i,iitem in enumerate(lines):
-        xml_out_DDD.write(iitem)
-    xml_out_DDD.close()  
+    # 將xml檔案寫入
+    tree.write(file_path, encoding="utf-8")
+
+    print("The XML file has been saved at : " + str(file_path))
+
+    return
 
 def save_jpg_layout():
     global downloads_path, jpglayout, drawings_number, dwgfile, narrowtype
@@ -1042,6 +1021,20 @@ def show_dwg_file(event):
     wall_depth_label.config(text="Wall Depth = 0 m")
     wall_thickness_label.config(text="Wall Thickness = 0 m")
 
+def save_to_new_file():
+    file_path = filedialog.asksaveasfilename(defaultextension=".xml", filetypes=[("XML files", "*.xml"), ("All files", "*.*")])
+    if file_path:
+        save_xml_file(file_path)
+        window.quit()
+        window.destroy()
+
+def save_to_existing_file():
+    file_path = filedialog.askopenfilename(defaultextension=".xml", filetypes=[("XML files", "*.xml"), ("All files", "*.*")])
+    if file_path:
+        save_xml_file(file_path)
+        window.quit()
+        window.destroy()
+
 # Create the Tkinter window
 window = tk.Tk()
 window.title("Reading Results")
@@ -1128,8 +1121,10 @@ wall_thickness_label = tk.Label(menu_frame, text="Wall Thickness = 0 m", font=("
 wall_thickness_label.pack(pady=0)
 
 # Create a button to select XML file directory
-save_xml_button = tk.Button(menu_frame, text="Save XML File", command=save_xml_file)
-save_xml_button.pack(pady=5, padx=(0, 0))
+new_file_button = tk.Button(menu_frame, text="存入新檔", command=save_to_new_file)
+existing_file_button = tk.Button(menu_frame, text="寫入舊檔", command=save_to_existing_file)
+new_file_button.pack(pady=5, padx=(0, 0))
+existing_file_button.pack(pady=5, padx=(0, 0))
 
 # Create a button to select JPG layout directory
 save_jpg_button = tk.Button(menu_frame, text="Save JPG Layout", command=save_jpg_layout)

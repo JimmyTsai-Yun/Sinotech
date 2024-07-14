@@ -212,81 +212,59 @@ print(rebar_protection_diaphragm)
 
 # %%
 # Check Final Reading Results
+import xml.etree.ElementTree as ET
+from lib.utils import create_or_read_xml
+def save_xml_file(file_path):
+    global wall_strength1, wall_strength2, rebar_strength1, rebar_strength2, rebar_protection_exposed, rebar_protection_diaphragm
 
-def save_xml_file():
-    global downloads_path, xmlfname, wall_strength1, wall_strength2, rebar_strength1, rebar_strength2
+    tree, root = create_or_read_xml(file_path)
 
-    file_path = filedialog.askdirectory( title='Please choose the save location for the XML file.',initialdir=downloads_path)
+    # 檢查是否有plans子節點，若無則創建，若有則刪除
+    structure = root.find(".//Drawing[@description='結構一般説明']")
+    if structure is None:
+        structure = ET.SubElement(root, "Drawing", description='結構一般説明')
+    else:
+        # 移除plans的所有子節點
+        for child in list(structure):
+            structure.remove(child)
 
-    try:
-        downloads_path = file_path
-        xmlfname = os.path.join(downloads_path, "Result.xml")
-        print("The XML file has been saved at : " + str(xmlfname))
-    except Exception as e:
-        print(f"Error: {e}")
-        downloads_path = str(Path.home() / "Downloads")
-        xmlfname = os.path.join(downloads_path, "Result.xml")
-        print("The XML file will be saved at the default location : " + str(xmlfname))
+    # Add Concrete info
+    concrete = ET.SubElement(structure, "Concrete", Description="混凝土")
+    for i, strength in enumerate([wall_strength1, wall_strength2], 1):
+        strength_elem = ET.SubElement(concrete, f"Strength{i}", Description=f"强度{i}")
+        ET.SubElement(strength_elem, "Value", unit="kgf/cm2").text = str(strength)
 
-    #Export to XML
-    xml_out_DD = open(xmlfname, 'ab')
-    xml_out_DD.write(bytes('<WorkItem><File Description="設計圖說">', 'utf-8'))
-    xml_out_DD.write(bytes('<Drawing Description="結構一般説明">', 'utf-8'))
-    xml_out_DD.write(bytes("""
-    <Concrete Description="混凝土" >
-    <Strength1 Description="强度1" >
-    <Value unit="kgf/cm2" >"""+str(wall_strength1)+"""</Value>
-    </Strength1>
-    <Strength2 Description="强度2" >
-    <Value unit="kgf/cm2" >"""+str(wall_strength2)+"""</Value>
-    </Strength2>
-    </Concrete>
-    <Rebar Description="鋼筋" >
-    <Strength1 Description="强度1" >
-    <Value unit="kgf/cm2" >"""+str(rebar_strength1)+"""</Value>
-    </Strength1>
-    <Strength2 Description="强度2" >
-    <Value unit="kgf/cm2" >"""+str(rebar_strength2)+"""</Value>
-    </Strength2>
-    </Rebar>
-    <Protection Description="保護層" >
-    <Exposed Description="暴露部分" >
-    <Value unit="mm" >"""+str(rebar_protection_exposed)+"""</Value>
-    </Exposed>
-    <Diaphragm Description="雙面" >
-    <Value unit="mm" >"""+str(rebar_protection_diaphragm)+"""</Value>
-    </Diaphragm>
-    </Protection>
-    """, 'utf-8'))
-    xml_out_DD.write(bytes('</Drawing></File></WorkItem>', 'utf-8'))
-    xml_out_DD.close()  
+    # Add Rebar info
+    rebar = ET.SubElement(structure, "Rebar", Description="鋼筋")
+    for i, strength in enumerate([rebar_strength1, rebar_strength2], 1):
+        strength_elem = ET.SubElement(rebar, f"Strength{i}", Description=f"强度{i}")
+        ET.SubElement(strength_elem, "Value", unit="kgf/cm2").text = str(strength)
 
-    with open(xmlfname, 'rb') as f:
-        lines = f.readlines()
-        target=bytes('</File></WorkItem><WorkItem><File Description="設計圖說">', 'utf-8')
-        repget_head=bytes('<Drawing Description="結構一般説明">', 'utf-8')
-        repget_tail=bytes('</Drawing>', 'utf-8')
-        repget_count=[]
-        for i,iitem in enumerate(lines):
-            target_pos=[]
-            target_pos=iitem.find(target)
-            if repget_tail in iitem and len(repget_count)>0:
-                repget_count[-1].append(i)
-            if repget_head in iitem:
-                repget_count.append([i])
-            if target_pos!=-1:
-                lines[i]=lines[i][:target_pos]+lines[i][target_pos+len(target):]
-        for i,iitem in enumerate(repget_count[:-1]):
-            head_pos=lines[iitem[0]].find(repget_head)
-            tail_pos=lines[iitem[1]].find(repget_tail)
-            lines[iitem[0]]=lines[iitem[0]][:head_pos]
-            lines[iitem[1]]=lines[iitem[1]][tail_pos+len(repget_tail):]
-            del lines[iitem[0]+1:iitem[1]]
+    # Add Protection info
+    protection = ET.SubElement(structure, "Protection", Description="保護層")
+    ET.SubElement(ET.SubElement(protection, "Exposed", Description="暴露部分"), 
+                  "Value", unit="mm").text = str(rebar_protection_exposed)
+    ET.SubElement(ET.SubElement(protection, "Diaphragm", Description="雙面"), 
+                  "Value", unit="mm").text = str(rebar_protection_diaphragm)
+    
+    # 將xml檔案寫入指定路徑
+    tree.write(file_path, encoding='utf-8', xml_declaration=True)
 
-    xml_out_DDD = open(xmlfname, 'wb')
-    for i,iitem in enumerate(lines):
-        xml_out_DDD.write(iitem)
-    xml_out_DDD.close()  
+    return
+
+def save_to_new_file():
+    file_path = filedialog.asksaveasfilename(defaultextension=".xml", filetypes=[("XML files", "*.xml"), ("All files", "*.*")])
+    if file_path:
+        save_xml_file(file_path)
+        window.quit()
+        window.destroy()
+
+def save_to_existing_file():
+    file_path = filedialog.askopenfilename(defaultextension=".xml", filetypes=[("XML files", "*.xml"), ("All files", "*.*")])
+    if file_path:
+        save_xml_file(file_path)
+        window.quit()
+        window.destroy()
 
 downloads_path = str(Path.home() / "Downloads")
 xmlfname = os.path.join(downloads_path, "Result.xml")
@@ -349,8 +327,15 @@ rebar_protection_diaphragm_label.grid(row=5, column=0, padx=10, pady=5, sticky=t
 colon_label6.grid(row=5, column=1, padx=2, pady=5)
 rebar_protection_diaphragm_value.grid(row=5, column=2, padx=10, pady=5, sticky=tk.W)
 
-save_xml_button = tk.Button(window, text="Save XML File", command=save_xml_file)
-save_xml_button.pack(pady=(0,15), padx=(0, 0))
+# Create button frame
+button_frame = tk.Frame(window)
+button_frame.pack(pady=(10,15))
+# Create buttons
+new_file_button = tk.Button(button_frame, text="存入新檔", command=save_to_new_file)
+existing_file_button = tk.Button(button_frame, text="寫入舊檔", command=save_to_existing_file)
+# Place buttons in the frame
+new_file_button.pack(side=tk.RIGHT, padx=5)
+existing_file_button.pack(side=tk.RIGHT, padx=5)
 
 # Run the Tkinter event loop
 window.mainloop()

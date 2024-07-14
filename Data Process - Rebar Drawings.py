@@ -200,7 +200,7 @@ for image in tqdm(range(len(img))):
     _, img_th = cv2.threshold (img_gray, 240, 255, 0)
 
     bounds_1 = reader.readtext(img_th , detail=1)
-    array_1 = np.array(bounds_1, dtype=object)
+    # array_1 = np.array(bounds_1, dtype=object)
 
     # 讀垂直字
     cv_img = cv2.cvtColor(np.asarray(img[image]), cv2.COLOR_RGB2BGR)
@@ -209,7 +209,7 @@ for image in tqdm(range(len(img))):
     _, img_th_ROTATE_90_CLOCKWISE = cv2.threshold (img_gray_ROTATE_90_CLOCKWISE, 210, 255, 0)
 
     bounds_2 = reader.readtext(img_th_ROTATE_90_CLOCKWISE , detail=1)
-    array_2 = np.array(bounds_2, dtype=object)
+    # array_2 = np.array(bounds_2, dtype=object)
 
     # 0. rebar protection
     protection_check = -1
@@ -222,7 +222,7 @@ for image in tqdm(range(len(img))):
             protection_check = 1
             break
     if protection_check == -1:
-        rebar_protection_list.append("No found")
+        rebar_protection_list.append("75")
     
 
     # 1. wall type
@@ -1130,20 +1130,143 @@ from tkinter import ttk
 from pathlib import Path
 import os
 
-def save_xml_file():
-    global downloads_path, xmlfname, wall_strength1, wall_strength2, rebar_strength1, rebar_strength2
+import xml.etree.ElementTree as ET
+from lib.utils import create_or_read_xml, check_attribute_exists
+def save_xml_file(file_path):
+    global wall_type_list, hori_rebar_list, dwg_vert_rebar_info, shear_rebar_list, rebar_protection_list
 
-    file_path = filedialog.askdirectory( title='Please choose the save location for the XML file.',initialdir=downloads_path)
+    tree, root = create_or_read_xml(file_path)
 
-    try:
-        downloads_path = file_path
-        xmlfname = os.path.join(downloads_path, "Result.xml")
-        print("The XML file has been saved at : " + str(xmlfname))
-    except Exception as e:
-        print(f"Error: {e}")
-        downloads_path = str(Path.home() / "Downloads")
-        xmlfname = os.path.join(downloads_path, "Result.xml")
-        print("The XML file will be saved at the default location : " + str(xmlfname))
+    # 檢查是否有plans子節點，若無則創建，若有則刪除
+    rebars = root.find(".//Drawing[@description='配筋圖']")
+    if rebars is None:
+        rebars = ET.SubElement(root, "Drawing", description="配筋圖")
+
+    for n, type in enumerate(wall_type_list):
+        if check_attribute_exists(rebars, "description", "TYPE "+str(type)):
+            continue
+        work_item_type = ET.SubElement(rebars, "WorkItemType", description="TYPE "+str(type))
+            # create a new Diaphragm element
+        DiaphragmWall = ET.SubElement(work_item_type, "DiaphragmWall", description="連續壁")
+                # Create a new Concrete element
+        concrete = ET.SubElement(DiaphragmWall, "Concrete")
+                    # Create a new Strength element
+        strength = ET.SubElement(concrete, "Strength", description="混凝土強度")
+        strength_value = ET.SubElement(strength, "Value", unit="kgf/cm^2")
+                    # Create a new Total element
+        total = ET.SubElement(concrete, "Total", description="數量")
+        total_value = ET.SubElement(total, "Value", unit="m2")
+                # Create a new Length element
+        length_element = ET.SubElement(DiaphragmWall, "Length", description="行進米")
+        length_value = ET.SubElement(length_element, "Value", unit="m")
+                # Create a new Depth element
+        depth = ET.SubElement(DiaphragmWall, "Depth", description="設計深度")
+        depth_value = ET.SubElement(depth, "Value", unit="m")
+        depth_value.text = str(int(wall_depth_list[n])/1000)
+                # Create a new Thickness element
+        thickness_element = ET.SubElement(DiaphragmWall, "Thickness", description="厚度")
+        thickness_value = ET.SubElement(thickness_element, "Value", unit="m")
+        thickness_value.text = str(int(wall_thick_list[n])/1000)
+
+            # create a RebarGroup element
+        RebarGroup = ET.SubElement(rebars, "RebarGroup", description="鋼筋") 
+                # create a new HorznRebar element
+        HorznRebar = ET.SubElement(RebarGroup, "HorznRebar", description="水平筋")
+        for hr, hrzn_rebar_info in enumerate(hori_rebar_list[n]):
+                    # create a new Rebar element
+            Rebar = ET.SubElement(HorznRebar, "Rebar", description="鋼筋資訊")
+                    # create a new Type element
+            Type = ET.SubElement(Rebar, "Type", description="水平筋設計")
+            Type_value = ET.SubElement(Type, "Value", unit="mm")
+            Type_value.text = str(hrzn_rebar_info)
+
+                # crdate a new VertRebar element
+        VertRebar = ET.SubElement(RebarGroup, "VertRebar", description="垂直筋")
+                    # create a new  Retaining element
+        Retaining = ET.SubElement(VertRebar, "Retaining")
+                    # create a new  Excavation element
+        Excavation = ET.SubElement(VertRebar, "Excavation")
+        for vr, vert_rebar_info in enumerate(dwg_vert_rebar_info[n]):
+            if "retain" in vert_rebar_info.rebar_side[1:-1].lower():
+                    # create a new Rebar element
+                Rebar = ET.SubElement(Retaining, "Rebar", description="鋼筋資訊")
+                        # create a new Type element
+                Type = ET.SubElement(Rebar, "Type", description="垂直筋設計")
+                Type_value = ET.SubElement(Type, "Value", unit="mm")
+                Type_value.text = str(vert_rebar_info.rebar_type)
+                        # create a new StartDepth element
+                StartDepth = ET.SubElement(Rebar, "StartDepth", description="開起深度")
+                StartDepth_value = ET.SubElement(StartDepth, "Value", unit="m")
+                StartDepth_value.text = str(vert_rebar_info.depth_level1)
+                        # create a new EndDepth element
+                EndDepth = ET.SubElement(Rebar, "EndDepth", description="結束深度")
+                EndDepth_value = ET.SubElement(EndDepth, "Value", unit="m")
+                EndDepth_value.text = str(vert_rebar_info.depth_level2)
+
+            if "excavat" in vert_rebar_info.rebar_side[1:-1].lower():
+                    # create a new Rebar element
+                Rebar = ET.SubElement(Excavation, "Rebar", description="鋼筋資訊")
+                        # create a new Type element
+                Type = ET.SubElement(Rebar, "Type", description="垂直筋設計")
+                Type_value = ET.SubElement(Type, "Value", unit="mm")
+                Type_value.text = str(vert_rebar_info.rebar_type)
+                        # create a new StartDepth element
+                StartDepth = ET.SubElement(Rebar, "StartDepth", description="開起深度")
+                StartDepth_value = ET.SubElement(StartDepth, "Value", unit="m")
+                StartDepth_value.text = str(vert_rebar_info.depth_level1)
+                        # create a new EndDepth element
+                EndDepth = ET.SubElement(Rebar, "EndDepth", description="結束深度")
+                EndDepth_value = ET.SubElement(EndDepth, "Value", unit="m")
+                EndDepth_value.text = str(vert_rebar_info.depth_level2)
+
+                # create a new ShearRebar element
+        ShearRebar = ET.SubElement(RebarGroup, "ShearRebar", description="剪力筋")
+        for sr, shear_rebar_info in enumerate(shear_rebar_list[n]):
+            if len(shear_rebar_info)>3:
+                sv_size,sv_spacing=shear_rebar_info[0].split("@")
+                sh_size,sh_spacing=shear_rebar_info[3].split("@")
+                    # create a new Rebar element
+                Rebar = ET.SubElement(ShearRebar, "Rebar", description="鋼筋資訊")
+                        # create a new Type element
+                Type = ET.SubElement(Rebar, "Type", description="剪力筋設計")
+                Type_value = ET.SubElement(Type, "Value", unit="mm")
+                Type_value.text = str(sv_size+"Sh "+sh_spacing+"Sv "+sv_spacing)
+                        # create a new StartDepth element
+                StartDepth = ET.SubElement(Rebar, "StartDepth", description="開起深度")
+                StartDepth_value = ET.SubElement(StartDepth, "Value", unit="m")
+                StartDepth_value.text = str(round(int(shear_rebar_info[1])/1000,1))
+                        # create a new EndDepth element
+                EndDepth = ET.SubElement(Rebar, "EndDepth", description="結束深度")
+                EndDepth_value = ET.SubElement(EndDepth, "Value", unit="m")
+                EndDepth_value.text = str(round(int(shear_rebar_info[2])/1000,1))
+
+            else:
+                sv_size,sv_spacing=shear_rebar_info[0].split("@")
+                    # create a new Rebar element
+                Rebar = ET.SubElement(ShearRebar, "Rebar", description="鋼筋資訊")
+                        # create a new Type element
+                Type = ET.SubElement(Rebar, "Type", description="剪力筋設計")
+                Type_value = ET.SubElement(Type, "Value", unit="mm")
+                Type_value.text = str(sv_size+" "+sv_spacing)
+                        # create a new StartDepth element
+                StartDepth = ET.SubElement(Rebar, "StartDepth", description="開起深度")
+                StartDepth_value = ET.SubElement(StartDepth, "Value", unit="m")
+                StartDepth_value.text = str(round(int(shear_rebar_info[1])/1000,1))
+                        # create a new EndDepth element
+                EndDepth = ET.SubElement(Rebar, "EndDepth", description="結束深度")
+                EndDepth_value = ET.SubElement(EndDepth, "Value", unit="m")
+                EndDepth_value.text = str(round(int(shear_rebar_info[2])/1000,1))
+
+                # create a new Protection element
+        Protection = ET.SubElement(RebarGroup, "Protection", description="保護層")
+        Protection_value = ET.SubElement(Protection, "Value", unit="mm")
+        Protection_value.text = str(rebar_protection_list[n])
+
+    tree.write(file_path, encoding="utf-8", xml_declaration=True)
+
+    print("The XML file has been saved at : " + file_path)
+
+    return
 
     #Export to XML
     xml_out_DD = open(xmlfname, 'ab')
@@ -1322,6 +1445,20 @@ def show_dwg_file(event):
         table_data = "| {:^18s} | {:^18s} | {:^18s} | {:^18s} |".format(sh_size, str(rebar[0]), str(round(int(rebar[1])/1000,1)), str(round(int(rebar[2])/1000,1)))
         shear_rebar_listbox.insert(tk.END, table_data)
 
+def save_to_new_file():
+    file_path = filedialog.asksaveasfilename(defaultextension=".xml", filetypes=[("XML files", "*.xml"), ("All files", "*.*")])
+    if file_path:
+        save_xml_file(file_path)
+        window.quit()
+        window.destroy()
+
+def save_to_existing_file():
+    file_path = filedialog.askopenfilename(defaultextension=".xml", filetypes=[("XML files", "*.xml"), ("All files", "*.*")])
+    if file_path:
+        save_xml_file(file_path)
+        window.quit()
+        window.destroy()
+
 downloads_path = str(Path.home() / "Downloads")
 xmlfname = os.path.join(downloads_path, "Result.xml")
 drawing_number = 0
@@ -1388,8 +1525,10 @@ shear_rebar_listbox = tk.Listbox(menu_frame, font=('Courier New', 12), width=85,
 shear_rebar_listbox.pack(pady=5)
 
 # Create a button to select XML file directory
-save_xml_button = tk.Button(menu_frame, text="Save XML File", command=save_xml_file)
-save_xml_button.pack(pady=(5,0), padx=(0, 0))
+new_file_button = tk.Button(menu_frame, text="存入新檔", command=save_to_new_file)
+existing_file_button = tk.Button(menu_frame, text="寫入舊檔", command=save_to_existing_file)
+new_file_button.pack(pady=5, padx=(0, 0))
+existing_file_button.pack(pady=5, padx=(0, 0))
 
 # Show the first dwg
 select_dwg_combobox.current(0)
