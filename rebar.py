@@ -178,10 +178,7 @@ class BoredPile_rebar(Base_rebar):
         rebars = root.find(".//Drawing[@description='配筋圖']")
         if rebars is None:
             rebars = ET.SubElement(root, "Drawing", description="配筋圖")
-        else:
-            # 移除plans的所有子節點
-            for child in list(rebars):
-                rebars.remove(child)
+
         # 將response_list寫入配筋圖子節點
         for pile_type, pile_info in response_dic.items():
             if check_attribute_exists(rebars, 'TYPE', pile_type):

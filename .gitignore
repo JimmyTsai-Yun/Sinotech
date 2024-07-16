@@ -34,3 +34,8 @@ dist/
 
 # build directory
 build/
+
+# .spec
+*.spec
+
+EXTRACTDIAPHRAGMWALL_0911.lsp
