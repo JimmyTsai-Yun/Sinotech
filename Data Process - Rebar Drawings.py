@@ -211,20 +211,6 @@ for image in tqdm(range(len(img))):
     bounds_2 = reader.readtext(img_th_ROTATE_90_CLOCKWISE , detail=1)
     # array_2 = np.array(bounds_2, dtype=object)
 
-    # 0. rebar protection
-    protection_check = -1
-    for bound in bounds_1:
-       pattern = r'(\d+)\s*CL'
-       match = re.search(pattern, bound[1])
-       if match:
-            print(f'{image+1}頁: {match.group(1)}mm')
-            rebar_protection_list.append(match.group(1))
-            protection_check = 1
-            break
-    if protection_check == -1:
-        rebar_protection_list.append("75")
-    
-
     # 1. wall type
     key_word = "DIAPHRAGM WALL TYPE"
     wall_type = "No found"
@@ -240,9 +226,32 @@ for image in tqdm(range(len(img))):
     # If keyword no found, skip this drawing
     if(checking != True):
         drawing_to_skip.append(image)
+        print(f'{image+1}頁: No wall type found.')
         continue
 
     wall_type_list.append(wall_type)
+
+    # 0. rebar protection
+    protection_check = -1
+    for bound in bounds_1:
+       pattern = r'\b(\d+)\s*CL\b'
+       match = re.search(pattern, bound[1])
+       if match:
+            print(f'{image+1}頁: {match.group(1)}mm')
+            rebar_protection_list.append(match.group(1))
+            protection_check = 1
+            break
+    if protection_check == -1:
+        for bound in bounds_1:
+            pattern2 = r'\b(\d+)\s*E\b'
+            match2 = re.search(pattern2, bound[1])
+            if match2:
+                print(f'{image+1}頁: {match2.group(1)}mm')
+                rebar_protection_list.append(match2.group(1))
+                protection_check = 2
+                break
+    if protection_check == -1:
+        rebar_protection_list.append("75")
 
     # 2. wall depth and distribution
     depth_distribution = []

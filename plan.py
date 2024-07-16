@@ -285,7 +285,7 @@ class BoredPile_plan(Base_plan):
             else:
                 pile = ET.SubElement(plans, 'WorkItemType', description="PILE TYPE", TYPE=f"{pile_type}")
                 # 在 pile 底下建立 RowPile 子節點
-                rowpile = ET.SubElement(pile, 'RowPile', description="排樁")
+                rowpile = ET.SubElement(pile, 'Rowpile', description="排樁")
                 for key, value in pile_info.items():
                     if key == "type":
                         type = ET.SubElement(rowpile, 'Type', description="型式")
