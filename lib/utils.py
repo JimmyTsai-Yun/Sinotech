@@ -20,8 +20,18 @@ from itertools import cycle
 import threading
 import time
 import re
+from typing import Tuple
 
-def set_working_directory():
+def set_working_directory() -> str:
+    """
+    設置工作目錄為可執行文件所在的目錄。
+
+    如果程序被PyInstaller打包,則使用可執行文件的目錄。
+    否則,使用當前腳本文件的上級目錄。
+
+    Returns:
+        str: 設置後的當前工作目錄路徑
+    """
     # 當程式被 PyInstaller 打包時
     if hasattr(sys, '_MEIPASS'):
         # 設置工作目錄為可執行文件所在的目錄
@@ -37,15 +47,6 @@ def set_working_directory():
 
     return os.getcwd()
 
-'''
-Construct easyocr reader object
-'''
-def construct_easyocr_reader():
-    cwd = set_working_directory()
-    parent_dir = os.path.dirname(cwd)
-    model_path = os.path.join(parent_dir, '.EasyOCR\\model')
-    reader = easyocr.Reader(['en'], model_storage_directory=model_path)
-    return reader
 
 class OCRTool():
     def __init__(self, type="ch_tra"):
@@ -119,17 +120,6 @@ def pdf_to_images(pdf_path, dpi=210, output_folder="./", drawing_type="sheet_pil
             imgs_list.append(img_blur)
             # cv2.imwrite(output_folder + drawing_type + f"{i}.png", img_blur)
 
-    return imgs_list
-
-def pdf2images(pdf_path, dpi=210):
-    cwd = set_working_directory()
-    parent_dir = os.path.dirname(cwd)
-    poppler_path = os.path.join(parent_dir, 'poppler-24.02.0\\Library\\bin')
-    images = convert_from_path(pdf_path, dpi=dpi,  poppler_path=poppler_path)
-    imgs_list = []
-    for image in images:
-        np_img = np.array(image)
-        imgs_list.append(np_img)
     return imgs_list
 
 
@@ -361,7 +351,16 @@ class Loader:
         # handle exceptions with those variables ^
         self.stop()
 
-def create_or_read_xml(xml_path):
+def create_or_read_xml(xml_path: str) -> Tuple[ET.ElementTree, ET.Element]:
+    """
+    創建新的XML文件或讀取現有的XML文件。
+
+    Args:
+        xml_path (str): XML文件的路徑。
+
+    Returns:
+        Tuple[ET.ElementTree, ET.Element]: XML樹和根元素。
+    """
     try:
         tree = ET.parse(xml_path)
         root = tree.getroot()
@@ -369,23 +368,23 @@ def create_or_read_xml(xml_path):
         root = ET.Element('File', description='設計圖說')
         tree = ET.ElementTree(root)
         tree.write(xml_path, encoding='utf-8', xml_declaration=True)
-
     return tree, root
 
-def extract_sheetpile_type_depth(s):
-    # 使用正規表達式匹配型號和可能的數字錯誤
-    match = re.search(r"(\w+-\w+)\s+SHEET PILE \(L=([0-9l]+)m\)", s)
-    if match:
-        model = match.group(1)
-        # 將 'l' 替換為 '1'，只在數字部分處理
-        length_str = match.group(2).replace('l', '1').replace('L', '1')
-        try:
-            length = int(length_str)  # 嘗試轉換修正後的字符串為整數
-            return model, length
-        except ValueError:
-            return model, None  # 如果仍然出現轉換錯誤，則回傳 None 表示長度無效
-    else:
-        return None, None
+def check_attribute_exists(element: ET.Element, attribute_name: str, attribute_value: str) -> bool:
+    """
+    檢查給定元素下(ET.Element)是否存在具有特定屬性和值的節點。
+
+    Args:
+        element (ET.Element): 要檢查的XML元素。
+        attribute_name (str): 要查找的屬性名稱。
+        attribute_value (str): 要查找的屬性值。
+
+    Returns:
+        bool: 如果找到匹配的節點則返回True，否則返回False。
+    """
+    xpath = f".//*[@{attribute_name}='{attribute_value}']"
+    existing_item = element.find(xpath)
+    return existing_item is not None
     
 import tkinter as tk
 from tkinter import ttk
@@ -508,15 +507,38 @@ def create_gui(data_dict, table_name):
 
     return window.selected_file_path
 
-def check_attribute_exists(element, attribute_name, attribute_value):
-    """
-    檢查給定元素下是否存在具有特定屬性和值的節點。
+def extract_sheetpile_type_depth(s):
+    # 使用正規表達式匹配型號和可能的數字錯誤
+    match = re.search(r"(\w+-\w+)\s+SHEET PILE \(L=([0-9l]+)m\)", s)
+    if match:
+        model = match.group(1)
+        # 將 'l' 替換為 '1'，只在數字部分處理
+        length_str = match.group(2).replace('l', '1').replace('L', '1')
+        try:
+            length = int(length_str)  # 嘗試轉換修正後的字符串為整數
+            return model, length
+        except ValueError:
+            return model, None  # 如果仍然出現轉換錯誤，則回傳 None 表示長度無效
+    else:
+        return None, None
 
-    :param element: 要檢查的 XML 元素
-    :param attribute_name: 要查找的屬性名稱
-    :param attribute_value: 要查找的屬性值
-    :return: 如果找到匹配的節點則返回 True，否則返回 False
-    """
-    xpath = f".//*[@{attribute_name}='{attribute_value}']"
-    existing_item = element.find(xpath)
-    return existing_item is not None
+# '''
+# Construct easyocr reader object
+# '''
+# def construct_easyocr_reader():
+#     cwd = set_working_directory()
+#     parent_dir = os.path.dirname(cwd)
+#     model_path = os.path.join(parent_dir, '.EasyOCR\\model')
+#     reader = easyocr.Reader(['en'], model_storage_directory=model_path)
+#     return reader
+
+def pdf2images(pdf_path, dpi=210):
+    cwd = set_working_directory()
+    parent_dir = os.path.dirname(cwd)
+    poppler_path = os.path.join(parent_dir, 'poppler-24.02.0\\Library\\bin')
+    images = convert_from_path(pdf_path, dpi=dpi,  poppler_path=poppler_path)
+    imgs_list = []
+    for image in images:
+        np_img = np.array(image)
+        imgs_list.append(np_img)
+    return imgs_list
