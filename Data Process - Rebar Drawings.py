@@ -1178,7 +1178,7 @@ def save_xml_file(file_path):
         thickness_value.text = str(int(wall_thick_list[n])/1000)
 
             # create a RebarGroup element
-        RebarGroup = ET.SubElement(rebars, "RebarGroup", description="鋼筋") 
+        RebarGroup = ET.SubElement(work_item_type, "RebarGroup", description="鋼筋") 
                 # create a new HorznRebar element
         HorznRebar = ET.SubElement(RebarGroup, "HorznRebar", description="水平筋")
         for hr, hrzn_rebar_info in enumerate(hori_rebar_list[n]):
