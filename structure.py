@@ -1,11 +1,12 @@
 from lib.utils import *
-from lib.structure_utils import get_the_num, check_is_right
+import pandas as pd
+import numpy as np
+import re
+import csv
 import keyboard
 import tkinter as tk
 from tkinter import filedialog
-from pathlib import Path
 import os
-import cv2
 
 class Base_structure():
     def __init__(self, **kwargs):
@@ -13,9 +14,55 @@ class Base_structure():
         self.csv_path = kwargs.get("csv_path")
         self.output_path = kwargs.get("output_path")
         self.use_azure = kwargs.get("use_azure")
-        self.ocr_tool = OCRTool(type="ch_tra")
         if self.use_azure:
             self.client = construct_GPT4()
+
+    def custom_csv_parser(self, file_path, encoding='ISO-8859-1'):
+        rows = []
+        with open(file_path, encoding=encoding) as file:
+            reader = csv.reader(file)
+            for row in reader:
+                if len(row) > 8:
+                    row[7] = ', '.join(row[7:])
+                    row = row[:8]
+                row[-1] = row[-1].rstrip(', ')
+                rows.append(row)
+        return rows
+    
+    def parse_coordinate(self, coord_str):
+        # 使用正則表達式提取坐標值
+        match = re.match(r'\(([\d.]+)\s+([\d.]+)\s+([\d.]+)\)', coord_str)
+        if match:
+            return [float(match.group(1)), float(match.group(2)), float(match.group(3))]
+        else:
+            raise ValueError(f"無法解析坐標: {coord_str}")
+        
+    def find_nearest_two(self, target_column: str, candidate_columns: str, df: pd.DataFrame):
+
+        target_rows = df[df[target_column]].iloc[0]
+        candidate_rows = df[df[candidate_columns].notna()]
+
+        target_coords = np.array(self.parse_coordinate(target_rows['CentreCoor']))
+        candidate_coords = np.array([self.parse_coordinate(coord) for coord in candidate_rows['CentreCoor']])
+
+        # 計算 x 坐標差異和總距離
+        x_diff = candidate_coords[:, 0] - target_coords[0]
+        distances = np.sqrt(np.sum((candidate_coords[:, :2] - target_coords[:2])**2, axis=1))
+
+        # 只考慮 x 坐標大於的點
+        valid_indices = x_diff > 0
+        valid_distances = distances[valid_indices]
+        valid_candidate_rows = candidate_rows[valid_indices]
+
+        # 找出最近的兩個點
+        nearest_indices = np.argsort(valid_distances)[:2]
+
+        result = []
+        for idx in nearest_indices:
+            nearest_candidate_row = valid_candidate_rows.iloc[idx]
+            result.append(nearest_candidate_row[candidate_columns])
+
+        return result
     
     def run():
         pass
@@ -39,73 +86,21 @@ class Diaphragm_structure(Base_structure):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
     
-    def extrct_data(self, array):
-        # rules
-        length = len(array)
-        s_big_word = '直徑大於'
-        s_big_check = True
-        s_small_word = '直徑小於'
-        s_small_check = True
+    def call_ui(self, wall_strength1, wall_strength2, rebar_strength1, rebar_strength2, protection1, protection2):
+        def save_to_new_file():
+            file_path = filedialog.asksaveasfilename(defaultextension=".xml", filetypes=[("XML files", "*.xml"), ("All files", "*.*")])
+            if file_path:
+                self.save_xml_file(file_path, wall_strength1, wall_strength2, rebar_strength1, rebar_strength2, protection1, protection2)
+                self.window.quit()
+                self.window.destroy()
 
-        wall_check1 = True
-        wall_check2 = True
-        wall_check3 = True
-        wall_check4 = True
+        def save_to_existing_file():
+            file_path = filedialog.askopenfilename(defaultextension=".xml", filetypes=[("XML files", "*.xml"), ("All files", "*.*")])
+            if file_path:
+                self.save_xml_file(file_path, wall_strength1, wall_strength2, rebar_strength1, rebar_strength2, protection1, protection2)
+                self.window.quit()
+                self.window.destroy()
 
-        for i in range(length):
-            # check rebar strength 1
-            if array[i][1].find(s_big_word) > -1:
-                j = i
-                while s_big_check:
-                    if (array[j][1].upper()).find('KGF') > -1:
-                        rebar_strength1 = get_the_num(array[j][1])
-                        s_big_check = False
-                    j+=1   
-
-            # check rebar strength 2
-            if array[i][1].find(s_small_word) > -1:
-                k = i
-                while s_small_check:
-                    if (array[k][1].upper()).find('KGF') > -1:
-                        rebar_strength2 = get_the_num(array[k][1])
-                        s_small_check = False
-                    k+=1  
-
-            # check wall strength1
-            if array[i][1].find('最小抗壓強度') > -1:
-                h = i
-                while wall_check1 :
-                    if array[h][1].find('連續壁') > -1 :     
-                        wall_check1 = False
-                        w = h
-                        l = h
-                        while wall_check2 :
-                            if (array[w][1].upper()).find('KGF') > -1 :
-                                wall_check2 = False
-                                call = check_is_right(array, array[w][1], w)
-                                if call == 'True':
-                                    wall_strength1 = get_the_num(array[w][1])
-                                else:
-                                    wall_strength1 = call 
-                            w+=1
-                        while wall_check3 :
-                            if (array[l][1].upper()).find('WALLS') > -1 :
-                                wall_check3 = False
-                                o = l
-                                while wall_check4 :
-                                    if (array[o][1].upper()).find('KGF') > -1 :
-                                        call = check_is_right(array, array[o][1], o)
-                                        if call == 'True':
-                                            wall_strength2 = get_the_num(array[o][1])
-                                        else:
-                                            wall_strength2 = call 
-                                        wall_check4 = False
-                                    o+=1
-                            l+=1
-                    h+=1
-        return rebar_strength1, rebar_strength2, wall_strength1, wall_strength2
-    
-    def call_ui(self, wall_strength1, wall_strength2, rebar_strength1, rebar_strength2):
         self.window = tk.Tk()
         self.window.title("Reading Results")
 
@@ -120,19 +115,25 @@ class Diaphragm_structure(Base_structure):
         wall_strength2_label = tk.Label(label_frame, text="wall_strength2", font=("Arial", 14), fg="blue")
         rebar_strength1_label = tk.Label(label_frame, text="rebar_strength1", font=("Arial", 14), fg="blue")
         rebar_strength2_label = tk.Label(label_frame, text="rebar_strength2", font=("Arial", 14), fg="blue")
-
+        rebar_protection_exposed_label = tk.Label(label_frame, text="rebar_protection_exposed", font=("Arial", 14), fg="blue")
+        rebar_protection_diaphragm_label = tk.Label(label_frame, text="rebar_protection_diaphragm", font=("Arial", 14), fg="blue")
+        
         # Create labels for the ":" character
         colon_label1 = tk.Label(label_frame, text="=", font=("Arial", 14), fg="blue")
         colon_label2 = tk.Label(label_frame, text="=", font=("Arial", 14), fg="blue")
         colon_label3 = tk.Label(label_frame, text="=", font=("Arial", 14), fg="blue")
         colon_label4 = tk.Label(label_frame, text="=", font=("Arial", 14), fg="blue")
+        colon_label5 = tk.Label(label_frame, text="=", font=("Arial", 14), fg="blue")
+        colon_label6 = tk.Label(label_frame, text="=", font=("Arial", 14), fg="blue")
 
         # Create labels for the variable values with unit
         wall_strength1_value = tk.Label(label_frame, text=str(wall_strength1) + " kgf/cm2", font=("Arial", 14), fg="blue")
         wall_strength2_value = tk.Label(label_frame, text=str(wall_strength2) + " kgf/cm2", font=("Arial", 14), fg="blue")
         rebar_strength1_value = tk.Label(label_frame, text=str(rebar_strength1) + " kgf/cm2", font=("Arial", 14), fg="blue")
         rebar_strength2_value = tk.Label(label_frame, text=str(rebar_strength2) + " kgf/cm2", font=("Arial", 14), fg="blue")
-
+        rebar_protection_exposed_value = tk.Label(label_frame, text=str(protection1) + " mm", font=("Arial", 14), fg="blue")
+        rebar_protection_diaphragm_value = tk.Label(label_frame, text=str(protection2) + " mm", font=("Arial", 14), fg="blue")
+       
         # Place the labels in a grid
         wall_strength1_label.grid(row=0, column=0, padx=10, pady=5, sticky=tk.W)
         colon_label1.grid(row=0, column=1, padx=2, pady=5)
@@ -150,167 +151,30 @@ class Diaphragm_structure(Base_structure):
         colon_label4.grid(row=3, column=1, padx=2, pady=5)
         rebar_strength2_value.grid(row=3, column=2, padx=10, pady=5, sticky=tk.W)
 
-        save_xml_button = tk.Button(self.window, text="Save XML File", command = lambda: self.save_xml_file(wall_strength1, wall_strength2, rebar_strength1, rebar_strength2))
-        save_xml_button.pack(pady=(0,15), padx=(0, 0))
+        rebar_protection_exposed_label.grid(row=4, column=0, padx=10, pady=5, sticky=tk.W)
+        colon_label5.grid(row=4, column=1, padx=2, pady=5)
+        rebar_protection_exposed_value.grid(row=4, column=2, padx=10, pady=5, sticky=tk.W)
+
+        rebar_protection_diaphragm_label.grid(row=5, column=0, padx=10, pady=5, sticky=tk.W)
+        colon_label6.grid(row=5, column=1, padx=2, pady=5)
+        rebar_protection_diaphragm_value.grid(row=5, column=2, padx=10, pady=5, sticky=tk.W)
+
+        # Create button frame
+        button_frame = tk.Frame(self.window)
+        button_frame.pack(pady=(10,15))
+        # Create buttons
+        new_file_button = tk.Button(button_frame, text="存入新檔", command=save_to_new_file)
+        existing_file_button = tk.Button(button_frame, text="寫入舊檔", command=save_to_existing_file)
+        # Place buttons in the frame
+        new_file_button.pack(side=tk.RIGHT, padx=5)
+        existing_file_button.pack(side=tk.RIGHT, padx=5)
 
         # Run the Tkinter event loop
         self.window.mainloop()
 
-    def save_xml_file(self, wall_strength1, wall_strength2, rebar_strength1, rebar_strength2):
-        downloads_path = str(Path.home() / "Downloads")
-        file_path = filedialog.askdirectory( title='Please choose the save location for the XML file.',initialdir=downloads_path)
+    def save_xml_file(self, file_path, wall_strength1, wall_strength2, rebar_strength1, rebar_strength2, protection1, protection2):
+        tree, root = create_or_read_xml(file_path)
 
-        try:
-            downloads_path = file_path
-            xmlfname = os.path.join(downloads_path, "Result.xml")
-            print("The XML file has been saved at : " + str(xmlfname))
-        except Exception as e:
-            print(f"Error: {e}")
-            downloads_path = str(Path.home() / "Downloads")
-            xmlfname = os.path.join(downloads_path, "Result.xml")
-            print("The XML file will be saved at the default location : " + str(xmlfname))
-
-        #Export to XML
-        xml_out_DD = open(xmlfname, 'ab')
-        xml_out_DD.write(bytes('<WorkItem><File Description="設計圖說">', 'utf-8'))
-        xml_out_DD.write(bytes('<Drawing Description="結構一般説明">', 'utf-8'))
-        xml_out_DD.write(bytes("""
-        <Concrete Description="混凝土" >
-        <Strength1 Description="强度1" >
-        <Value unit="kgf/cm2" >"""+str(wall_strength1)+"""</Value>
-        </Strength1>
-        <Strength2 Description="强度2" >
-        <Value unit="kgf/cm2" >"""+str(wall_strength2)+"""</Value>
-        </Strength2>
-        </Concrete>
-        <Rebar Description="鋼筋" >
-        <Strength1 Description="强度1" >
-        <Value unit="kgf/cm2" >"""+str(rebar_strength1)+"""</Value>
-        </Strength1>
-        <Strength2 Description="强度2" >
-        <Value unit="kgf/cm2" >"""+str(rebar_strength2)+"""</Value>
-        </Strength2>
-        </Rebar>""", 'utf-8'))
-        xml_out_DD.write(bytes('</Drawing></File></WorkItem>', 'utf-8'))
-        xml_out_DD.close()  
-
-        with open(xmlfname, 'rb') as f:
-            lines = f.readlines()
-            target=bytes('</File></WorkItem><WorkItem><File Description="設計圖說">', 'utf-8')
-            repget_head=bytes('<Drawing Description="結構一般説明">', 'utf-8')
-            repget_tail=bytes('</Drawing>', 'utf-8')
-            repget_count=[]
-            for i,iitem in enumerate(lines):
-                target_pos=[]
-                target_pos=iitem.find(target)
-                if repget_tail in iitem and len(repget_count)>0:
-                    repget_count[-1].append(i)
-                if repget_head in iitem:
-                    repget_count.append([i])
-                if target_pos!=-1:
-                    lines[i]=lines[i][:target_pos]+lines[i][target_pos+len(target):]
-            for i,iitem in enumerate(repget_count[:-1]):
-                head_pos=lines[iitem[0]].find(repget_head)
-                tail_pos=lines[iitem[1]].find(repget_tail)
-                lines[iitem[0]]=lines[iitem[0]][:head_pos]
-                lines[iitem[1]]=lines[iitem[1]][tail_pos+len(repget_tail):]
-                del lines[iitem[0]+1:iitem[1]]
-
-        xml_out_DDD = open(xmlfname, 'wb')
-        for i,iitem in enumerate(lines):
-            xml_out_DDD.write(iitem)
-        xml_out_DDD.close()  
-
-        self.window.destroy()
-
-    def run(self):
-        try:
-            super().wait_pdf()
-
-            img_gray = pdf_to_images(self.pdf_path, dpi=300, preprocess=False)[0]
-            if self.use_azure:
-                pass
-            else:
-                array = self.ocr_tool.ocr(img_gray)
-                rebar_strength1, rebar_strength2, wall_strength1, wall_strength2 = self.extrct_data(array)
-
-        except Exception as e:
-            print(f"An error occurred: {e}")
-            wall_strength1 = 0
-            wall_strength2 = 0
-            rebar_strength1 = 0
-            rebar_strength2 = 0
-
-        self.call_ui(wall_strength1, wall_strength2, rebar_strength1, rebar_strength2)
-
-        return
-    
-class BoredPile_structure(Base_structure):
-    """Derived class for specific operations on BoredPile structure drawings."""
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    def re_match(self, string):
-        pattern = r'(\d+)\s*kgf/cm2'
-        match = re.search(pattern, string)
-        if match:
-            return int(match.group(1))
-        else:
-            return None
-
-    def extrct_data(self, bounds):
-
-        s_big_word = '直徑大於'
-        s_small_word = '直徑小於'
-        result_dic = {'Concrete':{'Strength1':0, 'Strength2':0},
-                          'Rebar':{'Strength1':0, 'Strength2':0}}
-
-        lengths_of_bounds = len(bounds)
-        
-        for i in range(lengths_of_bounds):
-            # check rebar strength 2
-            if bounds[i][1].find(s_big_word) > -1:
-                s_big_start = i
-                while True:
-                    if (bounds[s_big_start][1].upper()).find('KGF') > -1:
-                        result_dic["Rebar"]['Strength2'] = get_the_num(bounds[s_big_start][1])
-                        print(f'rebar strength 1: {result_dic["Rebar"]["Strength2"]}')
-                        break  
-                    s_big_start += 1
-
-            # check rebar strength 1
-            if bounds[i][1].find(s_small_word) > -1:
-                s_small_start = i
-                while True:
-                    if (bounds[s_small_start][1].upper()).find('KGF') > -1:
-                        result_dic["Rebar"]['Strength1'] = get_the_num(bounds[s_small_start][1])
-                        print(f'rebar strength 2: {result_dic["Rebar"]["Strength1"]}')
-                        break
-                    s_small_start += 1
-
-            # check wall strength1
-            if bounds[i][1].find('最小抗壓強度') > -1:
-                search_index = i
-                while True:
-                    if bounds[search_index][1].find('連續壁') > -1:
-                        check = self.re_match(bounds[search_index+1][1])
-                        if check:
-                            result_dic["Concrete"]['Strength1'] = check
-                            print(f'wall strength1: {result_dic["Concrete"]["Strength1"]}')
-                    if bounds[search_index][1].find('WALLS') > -1:
-                        check = self.re_match(bounds[search_index+1][1])
-                        if check:
-                            result_dic["Concrete"]['Strength2'] = check
-                            print(f'wall strength2: {result_dic["Concrete"]["Strength2"]}')
-                        break
-                    search_index += 1
-
-        return result_dic
-    
-    def save_xml_file(self, result_dic):
-        print("The XML file has been saved at : " + str(self.output_path))
-        # 檢查是否已經有xml檔案，若有則讀取，若無則創建
-        tree, root = create_or_read_xml(self.output_path)
         # 檢查是否有plans子節點，若無則創建，若有則刪除
         structure = root.find(".//Drawing[@description='結構一般説明']")
         if structure is None:
@@ -319,49 +183,239 @@ class BoredPile_structure(Base_structure):
             # 移除plans的所有子節點
             for child in list(structure):
                 structure.remove(child)
-        # 將result_dic的資料寫入xml檔案
-        for strength_key, value in result_dic.items():
-            if strength_key == 'Concrete':
-                strength_type = ET.SubElement(structure, strength_key, description='混凝土')
-            else:
-                strength_type = ET.SubElement(structure, strength_key, description='鋼筋')
-            for k, v in value.items():
-                if k == 'Strength1':
-                    strength = ET.SubElement(strength_type, k, description='强度1')
-                    value = ET.SubElement(strength, 'Value', unit='kgf/cm2')
-                    value.text = str(v)
-                else:
-                    strength = ET.SubElement(strength_type, k, description='强度2')
-                    value = ET.SubElement(strength, 'Value', unit='kgf/cm2')
-                    value.text = str(v)
+
+        # Add Concrete info
+        concrete = ET.SubElement(structure, "Concrete", Description="混凝土")
+        for i, strength in enumerate([wall_strength1, wall_strength2], 1):
+            strength_elem = ET.SubElement(concrete, f"Strength{i}", Description=f"强度{i}")
+            ET.SubElement(strength_elem, "Value", unit="kgf/cm2").text = str(strength)
+
+        # Add Rebar info
+        rebar = ET.SubElement(structure, "Rebar", Description="鋼筋")
+        for i, strength in enumerate([rebar_strength1, rebar_strength2], 1):
+            strength_elem = ET.SubElement(rebar, f"Strength{i}", Description=f"强度{i}")
+            ET.SubElement(strength_elem, "Value", unit="kgf/cm2").text = str(strength)
+
+        # Add Protection info
+        protection = ET.SubElement(structure, "Protection", Description="保護層")
+        ET.SubElement(ET.SubElement(protection, "Exposed", Description="暴露部分"), 
+                    "Value", unit="mm").text = str(protection1)
+        ET.SubElement(ET.SubElement(protection, "Diaphragm", Description="雙面"), 
+                    "Value", unit="mm").text = str(protection2)
         
         # 將xml檔案寫入指定路徑
-        tree.write(self.output_path, encoding='utf-8', xml_declaration=True)
+        tree.write(file_path, encoding='utf-8', xml_declaration=True)
+
+        return
+
+    def run(self):
+        fy_pattern = r'^fy\s+(\d+)\s+kgf/cm'
+        mm_pattern = r'^(\d+)\s+mm'
+        fc_pattern = r'^f\'c ¡Ù (\d+) kgf/cm'
+        protection_pattern2 = r'DIAPHRAGM\s+WALLS\s+\(BOTH\s+FACES\)'
+        protection_pattern1 = r'CONCRETE\s+CAST\s+AGAINST\s+AND\s+PERMANENTLY\s+EXPOSED\s+TO\s+WATER,\s+SOIL,\s+BLINDING'
+        rebar_strength_pattern2 = r'REINFORCEMENT\s+OF\s+10\s+mm\s+OR\s+SMALLER\s+IN\s+DIAMETER\s+SHALL\s+CONFORM\s+TO\s+CNS\s+560'
+        rebar_strength_pattern1 = r'REINFORCEMENT\s+OF\s+13\s+mm\s+OR\s+LARGER\s+IN\s+DIAMETER\s+SHALL\s+CONFORM\s+TO\s+CNS\s+560'
+        concrete_strength_pattern = r'^DIAPHRAGM\s+WALLS$'
+
+        # 使用自定義解析器讀取文件
+        rows = self.custom_csv_parser(self.csv_path)
+
+        # 定義標題列
+        columns = ["FileName", "EntityName", "ObjectType", "RotationAngle", "CentreCoor", "Height", "Width", "Text"]
+
+        # 將結果轉換為 DataFrame
+        df = pd.DataFrame(rows[1:], columns=columns)
+
+        # 創建一個新的列來存儲提取的數字
+        df['fy_number'] = df['Text'].str.extract(fy_pattern)
+        df['mm_number'] = df['Text'].str.extract(mm_pattern)
+        df['fc_number'] = df['Text'].str.extract(fc_pattern)
+        df['rebar_protection2'] = df['Text'].str.contains(protection_pattern2, regex=True)
+        df['rebar_protection1'] = df['Text'].str.contains(protection_pattern1, regex=True)
+        df['rebar_strength1'] = df['Text'].str.contains(rebar_strength_pattern1, regex=True)
+        df['rebar_strength2'] = df['Text'].str.contains(rebar_strength_pattern2, regex=True)
+        df['concrete_strength'] = df['Text'].str.contains(concrete_strength_pattern, regex=True)
+
+        # 如果您想將提取的數字轉換為整數
+        df['fy_number'] = df['fy_number'].astype(float)
+        df['mm_number'] = df['mm_number'].astype(float)
+        df['fc_number'] = df['fc_number'].astype(float)
+
+        # 找到 rebar_protection1 最近的兩個 mm_number
+        protection1 = self.find_nearest_two('rebar_protection1', 'mm_number', df)
+        print(f'The protection1 :{protection1[0]}')
+
+        # 找到 rebar_protection2 最近的兩個 mm_number
+        protection2 = self.find_nearest_two('rebar_protection2', 'mm_number', df)
+        print(f'The protection2 :{protection2[0]}')
+
+        # 找到 rebar_strength1 最近的兩個 fy_number
+        rebar_strength1 = self.find_nearest_two('rebar_strength1', 'fy_number', df)
+        print(f'The rebar_strength1 :{rebar_strength1[0]}')
+
+        # 找到 rebar_strength2 最近的兩個 fy_number
+        rebar_strength2 = self.find_nearest_two('rebar_strength2', 'fy_number', df)
+        print(f'The rebar_strength2 :{rebar_strength2[0]}')
+
+        # 找到 concrete_strength 最近的兩個 fc_number
+        concrete_strength = self.find_nearest_two('concrete_strength', 'fc_number', df)
+        print(f'The concrete_strength :{concrete_strength}')
+
+        self.call_ui(concrete_strength[0], concrete_strength[1], rebar_strength1[0], rebar_strength2[0], protection1[0], protection2[0])
+
+        os.remove(self.csv_path)
 
         return
     
+class BoredPile_structure(Base_structure):
+    """Derived class for specific operations on BoredPile structure drawings."""
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+    
+    def call_ui(self, wall_strength1, wall_strength2, rebar_strength1, rebar_strength2):
+        def save_to_new_file():
+            file_path = filedialog.asksaveasfilename(defaultextension=".xml", filetypes=[("XML files", "*.xml"), ("All files", "*.*")])
+            if file_path:
+                self.save_xml_file(file_path, wall_strength1, wall_strength2, rebar_strength1, rebar_strength2)
+                self.window.quit()
+                self.window.destroy()
+
+        def save_to_existing_file():
+            file_path = filedialog.askopenfilename(defaultextension=".xml", filetypes=[("XML files", "*.xml"), ("All files", "*.*")])
+            if file_path:
+                self.save_xml_file(file_path, wall_strength1, wall_strength2, rebar_strength1, rebar_strength2)
+                self.window.quit()
+                self.window.destroy()
+
+        self.window = tk.Tk()
+        self.window.title("Reading Results")
+
+        # Create a label for displaying "Plan/Elevation Drawing"
+        drawing_type_label = tk.Label(self.window, text="Drawing Type : Structural Descriptions", font=("Arial", 14))
+        drawing_type_label.pack(pady=(10,0))
+
+        # Create labels for the variables with unit
+        label_frame = tk.Frame(self.window)
+        label_frame.pack(side=tk.TOP,padx=(30,30), pady=(0,5))
+        wall_strength1_label = tk.Label(label_frame, text="wall_strength1", font=("Arial", 14), fg="blue")
+        wall_strength2_label = tk.Label(label_frame, text="wall_strength2", font=("Arial", 14), fg="blue")
+        rebar_strength1_label = tk.Label(label_frame, text="rebar_strength1", font=("Arial", 14), fg="blue")
+        rebar_strength2_label = tk.Label(label_frame, text="rebar_strength2", font=("Arial", 14), fg="blue")
+        
+        # Create labels for the ":" character
+        colon_label1 = tk.Label(label_frame, text="=", font=("Arial", 14), fg="blue")
+        colon_label2 = tk.Label(label_frame, text="=", font=("Arial", 14), fg="blue")
+        colon_label3 = tk.Label(label_frame, text="=", font=("Arial", 14), fg="blue")
+        colon_label4 = tk.Label(label_frame, text="=", font=("Arial", 14), fg="blue")
+
+        # Create labels for the variable values with unit
+        wall_strength1_value = tk.Label(label_frame, text=str(wall_strength1) + " kgf/cm2", font=("Arial", 14), fg="blue")
+        wall_strength2_value = tk.Label(label_frame, text=str(wall_strength2) + " kgf/cm2", font=("Arial", 14), fg="blue")
+        rebar_strength1_value = tk.Label(label_frame, text=str(rebar_strength1) + " kgf/cm2", font=("Arial", 14), fg="blue")
+        rebar_strength2_value = tk.Label(label_frame, text=str(rebar_strength2) + " kgf/cm2", font=("Arial", 14), fg="blue")
+       
+        # Place the labels in a grid
+        wall_strength1_label.grid(row=0, column=0, padx=10, pady=5, sticky=tk.W)
+        colon_label1.grid(row=0, column=1, padx=2, pady=5)
+        wall_strength1_value.grid(row=0, column=2, padx=10, pady=5, sticky=tk.W)
+
+        wall_strength2_label.grid(row=1, column=0, padx=10, pady=5, sticky=tk.W)
+        colon_label2.grid(row=1, column=1, padx=2, pady=5)
+        wall_strength2_value.grid(row=1, column=2, padx=10, pady=5, sticky=tk.W)
+
+        rebar_strength1_label.grid(row=2, column=0, padx=10, pady=5, sticky=tk.W)
+        colon_label3.grid(row=2, column=1, padx=2, pady=5)
+        rebar_strength1_value.grid(row=2, column=2, padx=10, pady=5, sticky=tk.W)
+
+        rebar_strength2_label.grid(row=3, column=0, padx=10, pady=5, sticky=tk.W)
+        colon_label4.grid(row=3, column=1, padx=2, pady=5)
+        rebar_strength2_value.grid(row=3, column=2, padx=10, pady=5, sticky=tk.W)
+
+        # Create button frame
+        button_frame = tk.Frame(self.window)
+        button_frame.pack(pady=(10,15))
+        # Create buttons
+        new_file_button = tk.Button(button_frame, text="存入新檔", command=save_to_new_file)
+        existing_file_button = tk.Button(button_frame, text="寫入舊檔", command=save_to_existing_file)
+        # Place buttons in the frame
+        new_file_button.pack(side=tk.RIGHT, padx=5)
+        existing_file_button.pack(side=tk.RIGHT, padx=5)
+
+        # Run the Tkinter event loop
+        self.window.mainloop()
+
+    def save_xml_file(self, file_path, wall_strength1, wall_strength2, rebar_strength1, rebar_strength2):
+        tree, root = create_or_read_xml(file_path)
+
+        # 檢查是否有plans子節點，若無則創建，若有則刪除
+        structure = root.find(".//Drawing[@description='結構一般説明']")
+        if structure is None:
+            structure = ET.SubElement(root, "Drawing", description='結構一般説明')
+        else:
+            # 移除plans的所有子節點
+            for child in list(structure):
+                structure.remove(child)
+
+        # Add Concrete info
+        concrete = ET.SubElement(structure, "Concrete", Description="混凝土")
+        for i, strength in enumerate([wall_strength1, wall_strength2], 1):
+            strength_elem = ET.SubElement(concrete, f"Strength{i}", Description=f"强度{i}")
+            ET.SubElement(strength_elem, "Value", unit="kgf/cm2").text = str(strength)
+
+        # Add Rebar info
+        rebar = ET.SubElement(structure, "Rebar", Description="鋼筋")
+        for i, strength in enumerate([rebar_strength1, rebar_strength2], 1):
+            strength_elem = ET.SubElement(rebar, f"Strength{i}", Description=f"强度{i}")
+            ET.SubElement(strength_elem, "Value", unit="kgf/cm2").text = str(strength)
+        
+        # 將xml檔案寫入指定路徑
+        tree.write(file_path, encoding='utf-8', xml_declaration=True)
+
+        return
+
     def run(self):
-        try:
-            super().wait_pdf()
+        fy_pattern = r'^fy\s+(\d+)\s+kgf/cm'
+        fc_pattern = r'^f\'c ¡Ù (\d+) kgf/cm'
 
-            result_dic = {'Concrete Strength':{'strength1':0, 'strength2':0},
-                          'Rebar Strength':{'strength1':0, 'strength2':0}}
+        rebar_strength_pattern2 = r'REINFORCEMENT\s+OF\s+10\s+mm\s+OR\s+SMALLER\s+IN\s+DIAMETER\s+SHALL\s+CONFORM\s+TO\s+CNS\s+560'
+        rebar_strength_pattern1 = r'REINFORCEMENT\s+OF\s+13\s+mm\s+OR\s+LARGER\s+IN\s+DIAMETER\s+SHALL\s+CONFORM\s+TO\s+CNS\s+560'
+        concrete_strength_pattern = r'^DIAPHRAGM\s+WALLS$'
 
-            img_rgb  = pdf_to_images(self.pdf_path, dpi=300, preprocess=False)[0]
+        # 使用自定義解析器讀取文件
+        rows = self.custom_csv_parser(self.csv_path)
 
-            img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_BGR2GRAY)
+        # 定義標題列
+        columns = ["FileName", "EntityName", "ObjectType", "RotationAngle", "CentreCoor", "Height", "Width", "Text"]
 
-            bounds = self.ocr_tool.ocr(img_gray)
+        # 將結果轉換為 DataFrame
+        df = pd.DataFrame(rows[1:], columns=columns)
 
-            result_dic = self.extrct_data(bounds)
+        # 創建一個新的列來存儲提取的數字
+        df['fy_number'] = df['Text'].str.extract(fy_pattern)
+        df['fc_number'] = df['Text'].str.extract(fc_pattern)
+        df['rebar_strength1'] = df['Text'].str.contains(rebar_strength_pattern1, regex=True)
+        df['rebar_strength2'] = df['Text'].str.contains(rebar_strength_pattern2, regex=True)
+        df['concrete_strength'] = df['Text'].str.contains(concrete_strength_pattern, regex=True)
 
-            self.output_path = create_gui(result_dic, 'BoredPile_structure')
+        # 如果您想將提取的數字轉換為整數
+        df['fy_number'] = df['fy_number'].astype(float)
+        df['fc_number'] = df['fc_number'].astype(float)
 
-            self.save_xml_file(result_dic)
+        # 找到 rebar_strength1 最近的兩個 fy_number
+        rebar_strength1 = self.find_nearest_two('rebar_strength1', 'fy_number', df)
+        print(f'The rebar_strength1 :{rebar_strength1[0]}')
 
-            os.remove(self.pdf_path)
+        # 找到 rebar_strength2 最近的兩個 fy_number
+        rebar_strength2 = self.find_nearest_two('rebar_strength2', 'fy_number', df)
+        print(f'The rebar_strength2 :{rebar_strength2[0]}')
 
-        except Exception as e:
-            print(f"An error occurred: {e}")
+        # 找到 concrete_strength 最近的兩個 fc_number
+        concrete_strength = self.find_nearest_two('concrete_strength', 'fc_number', df)
+        print(f'The concrete_strength :{concrete_strength}')
 
+        self.call_ui(concrete_strength[0], concrete_strength[1], rebar_strength1[0], rebar_strength2[0])
+
+        os.remove(self.csv_path)
+        
         return
