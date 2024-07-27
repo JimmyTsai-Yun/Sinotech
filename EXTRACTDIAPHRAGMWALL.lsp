@@ -1481,6 +1481,7 @@
   (setq helper_lst '(("FileName" "EntityName" "ObjectType" "BasePoint" "UpLeftPoint" "DownRightPoint")))
   (setq text_lst '(("FileName" "EntityName" "ObjectType" "RotationAngle" "CentreCoor" "Height" "Width" "Text")))
   (setq text_lst2 '(("FileName" "EntityName" "ObjectType" "RotationAngle" "CentreCoor" "Height" "Width" "Text")))
+  (setq full_text_lst '(("FileName" "EntityName" "ObjectType" "RotationAngle" "CentreCoor" "Height" "Width" "Text")))
   (setq line_lst2 '(("FileName" "EntityName" "Layer" "Length" "StartCoor" "EndCoor")))
   (setq helper_lst2 '(("FileName" "EntityName" "ObjectType" "BasePoint" "UpLeftPoint" "DownRightPoint")))
   
@@ -1664,9 +1665,32 @@
         ;Extract the text2
         (setq lst1 '())
         (setq lst2 '())
+        (setq lst_temp '())
+        (setq lst_temp1 '())
         (setq ss (vla-get-modelspace doc ))
         (vlax-for obj ss
           (setq x (vlax-vla-object->ename obj))
+
+          (if (eq (vla-get-objectname obj) "AcDbText")
+             (progn
+              (setq lst_temp (cons (cdr (assoc 1 (entget x))) lst_temp))
+              (setq lst_temp (cons (cdr (assoc 41 (entget x))) lst_temp))
+              (setq lst_temp (cons (cdr (assoc 40 (entget x))) lst_temp))
+              (setq CentreCoor (cdr (assoc 10 (entget x))))
+                (foreach num CentreCoor
+                  (setq num_str (rtos num 2 2))
+                  (setq CentreCoor (subst num_str num CentreCoor))
+              )
+              (setq lst_temp (cons CentreCoor lst_temp))
+              (setq lst_temp (cons (cdr (assoc 50 (entget x))) lst_temp))
+              (setq lst_temp (cons (vla-get-objectname obj) lst_temp))
+              (setq lst_temp (cons x lst_temp))
+              (setq lst_temp (cons dwgname lst_temp))
+              (setq lst_temp1 (cons lst_temp lst_temp1))
+              (setq lst_temp '())
+            )
+          )
+
           (if 
             (and
               (eq (vla-get-objectname obj) "AcDbText")
@@ -1698,6 +1722,8 @@
         )
         (setq lst1 lst1)
         (setq text_lst2 (append text_lst2 lst1))
+        (setq lst_temp1 lst_temp1)
+        (setq full_text_lst (append full_text_lst lst_temp1))
         ;end
         
         ;Extract the line2
@@ -1796,6 +1822,7 @@
   )
   
   (command "-Publish" (strcat dirpath "\\" "PUBLIST_2.dsd") )
+  (_writecsv "W" (strcat dirpath "\\Full Text Info.csv") full_text_lst)
   (_writecsv "W" (strcat dirpath "\\SH Text Info.csv") text_lst2)
   (_writecsv "W" (strcat dirpath "\\SH Line Info.csv") line_lst2)
   (_writecsv "W" (strcat dirpath "\\SH Helper Line Info.csv") helper_lst2)
