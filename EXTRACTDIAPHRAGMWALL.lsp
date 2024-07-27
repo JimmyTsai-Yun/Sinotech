@@ -1432,7 +1432,39 @@
 (defun mainloop3 (filepath dirpath filename)
   (vl-load-com)
   (setq doc (vla-Open (vla-get-documents (vlax-get-acad-object)) *temp*))
+  ; (setq full_text_lst '(("FileName" "EntityName" "ObjectType" "RotationAngle" "CentreCoor" "Height" "Width" "Text")))
   (vla-StartUndoMark doc)
+  ; (setq ss (vla-get-modelspace doc))
+  ; (setq lst_temp '())
+  ; (setq lst_temp1 '())
+  ; (vlax-for obj ss
+  ;   (setq x (vlax-vla-object->ename obj))
+  ;   (if (eq (vla-get-objectname obj) "AcDbText")
+  ;     (progn
+  ;       (setq lst_temp (cons (cdr (assoc 1 (entget x))) lst_temp))
+  ;       (setq lst_temp (cons (cdr (assoc 41 (entget x))) lst_temp))
+  ;       (setq lst_temp (cons (cdr (assoc 40 (entget x))) lst_temp))
+  ;       (setq CentreCoor (cdr (assoc 10 (entget x))))
+  ;         (foreach num CentreCoor
+  ;           (setq num_str (rtos num 2 2))
+  ;           (setq CentreCoor (subst num_str num CentreCoor))
+  ;       )
+  ;       (setq lst_temp (cons CentreCoor lst_temp))
+  ;       (setq lst_temp (cons (cdr (assoc 50 (entget x))) lst_temp))
+  ;       (setq lst_temp (cons (vla-get-objectname obj) lst_temp))
+  ;       (setq lst_temp (cons x lst_temp))
+  ;       (setq lst_temp (cons dwgname lst_temp))
+  ;       (setq lst_temp1 (cons lst_temp lst_temp1))
+  ;       (setq lst_temp '())
+  ;     )
+  ;   )
+  ; )
+  ; (setq lst_temp1 lst_temp1)
+  ; (setq full_text_lst (append full_text_lst lst_temp1))
+  ; ; print full text lst len
+  ; (princ (strcat "Full Text Info Length: " (itoa (length full_text_lst))))
+  
+  
   (setq layouts (vla-get-Layouts doc))
   (setq exportable "False")
   (vlax-for layout layouts
@@ -1454,6 +1486,8 @@
   )
   (makedsd dirpath filename "-Layout1.pdf" "PUBLIST.dsd")
   (command "-Publish" (strcat dirpath "\\" "PUBLIST.dsd") )
+  
+  ; (princ (strcat "start export the csv file to " dirpath))
   
   (vla-purgeall doc)
   (vla-EndUndoMark doc)
