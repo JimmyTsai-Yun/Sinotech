@@ -1,7 +1,7 @@
 from lib.utils import *
 import keyboard
+import pandas as pd
 import re
-import math
 
 # -------------------------------------------------------------------- #
 '''
@@ -44,52 +44,55 @@ class Base_rebar():
 class SheetPile_rebar(Base_rebar):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.ocr_tool = OCRTool(type='en')
-    
-    def extract_data(self, imgs_list):
-        num_imgs = len(imgs_list)
-        response_list = []
-
-        for i, img in enumerate(imgs_list):
-            print(f"Processing image {i+1}/{num_imgs}")
-            ocr_results = self.ocr_tool.ocr(img)
-            converted_text = None
-            for text_info in ocr_results:
-                if text_info[1].find("SHEET PILE") != -1:
-                    extracted_rawtext = text_info[1]
-                    converted_text = self.convert_sheet_pile_typename(extracted_rawtext)
-                    response_list.append(converted_text)
-
-        return response_list
     
     def run(self):
-        # change pdf to images
-        imgs_list = pdf_to_images(self.pdf_path, dpi=210, output_folder="./", drawing_type="sheet_pile-eval")
+        rows = custom_csv_parser(self.csv_path)
 
-        # extract data from images
-        response_list = self.extract_data(imgs_list)
+        columns = ["FileName", "EntityName", "ObjectType", "RotationAngle", "CentreCoor", "Height", "Width", "Text"]
+
+        # 將結果轉換為 DataFrame
+        df = pd.DataFrame(rows[1:], columns=columns)
+
+        grouped = df.groupby('FileName')
+        # 初始化一個集合，用於存儲鋼板樁文字(未經處理)
+        sheet_pile_text: set = set()
+        # 初始劃一個字典，用於存儲鋼板樁文字(經過處理)
+        sheet_pile_text_dict: dict = {}
+
+        for name, group in grouped:
+            print(f'File Name: {name}')
+
+            pattern:str=  r"(\S+)\s+SHEET\s+PILE\s+\(L=(\d+)m\)"
+
+            group['Type_name'], group['Length'] = zip(*group['Text'].str.extract(pattern).values)
+            group['Length'] = pd.to_numeric(group['Length'], errors='coerce')
+            group['Length'] = group['Length'].astype('Int64')
+
+            # get all the sheet pile text without Nan
+            sheet_pile_rows: pd.DataFrame = group.dropna(subset=['Type_name', 'Length']).copy()
+            # combine the 'Type_name' and 'Length' columns
+            sheet_pile_rows['Full_name'] = sheet_pile_rows['Type_name'] + ' ' + sheet_pile_rows['Length'].astype(str) + 'm'
+            # add the 'Full_name' to the set
+            sheet_pile_text.update(sheet_pile_rows['Full_name'])
+
+        print(sheet_pile_text)
+        # extract the sheet pile text from the set and add it to the dictionary
+        for text in sheet_pile_text:
+            pattern = r"(\S+)\s+(\d+)m"
+            name, length = re.match(pattern, text).groups()
+            sheet_pile_text_dict[text] = {'name': name, 'length': int(length)}
         
-        # remove duplicated response
-        response_list = list(set(response_list))
-        response_dic = {}
-        for pile_type in response_list:
-            single_type_result = {}
-            sheetpile_type, sheetpile_depth = extract_sheetpile_type_depth(pile_type)
-            single_type_result['Depth'] = sheetpile_depth
-            single_type_result['Type'] = sheetpile_type
-            full_name = f"{sheetpile_type} {sheetpile_depth}m"
-            response_dic[full_name] = single_type_result
-
-        self.output_path = create_gui(response_dic, "Sheet Pile Rebar")
+        # wait for the pdf to be created
+        self.output_path = create_gui(sheet_pile_text_dict, "Sheet Pile Rebar")
 
         # write the response to xml file
-        self.save_to_xml(response_list)
+        self.save_to_xml(sheet_pile_text_dict)
 
         # remove the pdf
-        os.remove(self.pdf_path)
+        os.remove(self.csv_path)
     
-    def save_to_xml(self, response_list):
-        print("資料萃取結果: ", response_list)
+    def save_to_xml(self, response_dic):
+        print("已將資料寫入xml檔案: ", self.output_path)
         # 檢查是否已經有xml檔案，若有則讀取，若無則創建
         tree, root = create_or_read_xml(self.output_path)
         # 檢查是否有plans子節點，若無則創建，若有則刪除
@@ -98,9 +101,9 @@ class SheetPile_rebar(Base_rebar):
             rebars = ET.SubElement(root, "Drawing", description="配筋圖")
 
         # 將response_list寫入配筋圖子節點
-        for pile_type in response_list:
-            sheetpile_type, sheetpile_depth = extract_sheetpile_type_depth(pile_type)
-            print(sheetpile_type, sheetpile_depth)
+        for pile_type, pile_info in response_dic.items():
+            sheetpile_type = pile_info['name']
+            sheetpile_depth = pile_info['length']
             if check_attribute_exists(rebars, 'DEPTH', f"Depth {str(sheetpile_depth)}m"):
                 continue
             else:
@@ -119,47 +122,159 @@ class SheetPile_rebar(Base_rebar):
         # 寫入xml檔案，utf-8編碼
         tree.write(self.output_path, encoding="utf-8")
 
-    def convert_sheet_pile_typename(self, sheet_pile_type):
-        replacements = {
-            "SP-W": "SP-III",
-            "SP-MI": "SP-III",
-            "SP- m": "SP-III",
-            "SP- MI": "SP-III",
-            "SP- W": "SP-III",
-            "SP- I": "SP-III",
-            "SP-I": "SP-III",
-            "SP-II": "SP-III",
-            "SP- H": "SP-III",
-            "SP-H": "SP-III"
-        }
-
-        # 通過正則表達式替換以確保只替換完整的詞組
-        for key, value in replacements.items():
-            pattern = r'\b' + re.escape(key) + r'\b'
-            sheet_pile_type = re.sub(pattern, value, sheet_pile_type)
-
-        return sheet_pile_type
-
 
 class BoredPile_rebar(Base_rebar):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.ocr_tool = OCRTool(type='en')
 
     def run(self):
         # init the result dic
         response_dic = {}
 
-        # change pdf to images
-        imgs_list = pdf_to_images(self.pdf_path, dpi=300, preprocess=False)
+        rows = custom_csv_parser(self.csv_path)
+        columns = ["FileName", "EntityName", "ObjectType", "RotationAngle", "CentreCoor", "Height", "Width", "Text"]
 
-        # extract data from images
-        for i, img in enumerate(imgs_list):
-            print(f"Processing image {i+1}/{len(imgs_list)}")
-            type_name, type_result = self.extract_data(img)
+        # 將結果轉換為 DataFrame
+        df = pd.DataFrame(rows[1:], columns=columns)
 
-            # add to the response_dic
-            response_dic[type_name] = type_result
+        grouped = df.groupby('FileName')
+        # 遍歷每個組
+        for name, group in grouped:
+            print(f"組名: {name}")
+
+            # 初始化儲存排樁形式的列表
+            type_name: str = 'Unknown'
+            # 初始化每種類型排樁的資料
+            type_data: dict = {'Depth':0,
+                            'Diameter':0,
+                            'Tiebeam_width':0,
+                            'Tiebeam_length':0,
+                            'Main_rebar':'Unknown',
+                            'Stirrup_rebar':'Unknown',
+                            'Concrete_strength':0}
+            
+            ''' 0. 一些預抓取資料'''
+            # EL
+            EL_pattern:str = r'^EL\s+(\d+\.\d+)'
+            group['Extracted_EL'] = group['Text'].str.extract(EL_pattern)
+            group['Extracted_EL'] = group['Extracted_EL'].astype(float)
+            EL_min: float = group['Extracted_EL'].dropna().min()
+            EL_max: float = group['Extracted_EL'].dropna().max()
+            # print(f"EL: {EL_min} ~ {EL_max}")
+
+            # 鋼筋
+            stirrup_rebar_pattern:str = r'^D(\d+)@(\d+)$'
+            group['Extracted_Rebar_diameter'], group['Extracted_Rebar_spacing'] = zip(*group['Text'].str.extract(stirrup_rebar_pattern).values)
+            group['Extracted_Rebar_diameter'] = pd.to_numeric(group['Extracted_Rebar_diameter'], errors='coerce')
+            group['Extracted_Rebar_spacing'] = pd.to_numeric(group['Extracted_Rebar_spacing'], errors='coerce')
+            group['Extracted_Rebar_diameter'] = group['Extracted_Rebar_diameter'].astype('Int64')
+            group['Extracted_Rebar_spacing'] = group['Extracted_Rebar_spacing'].astype('Int64')
+            # print(group[group['Extracted_Rebar_diameter'].notna()]['Text'])
+
+            # int numbers
+            int_pattern:str = r'^(\d+)$'
+            group['Extracted_Int'] = group['Text'].str.extract(int_pattern)
+            group['Extracted_Int'] = group['Extracted_Int'].astype(float)
+            # print(group[group['Extracted_Int'].notna()]['Text'])
+
+            # 混凝土強度
+            concrete_strength_pattern:str = r'(\d+)\s+kgf/cm\\U\+00B2$'
+            group['Extracted_Concrete_strength'] = group['Text'].str.extract(concrete_strength_pattern)
+            group['Extracted_Concrete_strength'] = group['Extracted_Concrete_strength'].astype(float)
+            
+            # 主筋
+            main_rebar_pattern:str = r'^(\d+)-D(\d+)$'
+            group['Extracted_Main_rebar_count'], group['Extracted_Main_rebar_diameter'] = zip(*group['Text'].str.extract(main_rebar_pattern).values)
+            group['Extracted_Main_rebar_count'] = pd.to_numeric(group['Extracted_Main_rebar_count'], errors='coerce')
+            group['Extracted_Main_rebar_diameter'] = pd.to_numeric(group['Extracted_Main_rebar_diameter'], errors='coerce')
+            group['Extracted_Main_rebar_count'] = group['Extracted_Main_rebar_count'].astype('Int64')
+            group['Extracted_Main_rebar_diameter'] = group['Extracted_Main_rebar_diameter'].astype('Int64')
+            # print(group[group['Extracted_Main_rebar_count'].notna()]['Text'])
+
+            ''' 1. 萃取型號 '''
+            type_pattern:str = r'BORED\s+PILE\s+TYPE\s+(\S+)'
+            group['Type_name'] = group['Text'].str.extract(type_pattern)
+            type_name = group['Type_name'].dropna().unique()
+            if len(type_name) > 0:
+                type_name = type_name[0]
+            else:
+                type_name = 'Unknown'
+            print(f"型號: {type_name}")
+            
+
+            ''' 2. 萃取深度 '''
+            Depth = EL_max - EL_min
+            type_data['Depth'] = Depth
+            print(f"深度: {Depth}")
+
+            ''' 3. 萃取直徑 '''
+            # extract the row which 'Text' equals to '場鑄擋土排樁'
+            diameter_row:pd.Series = group[group['Text'] == '場鑄擋土排樁']
+            x, y, z = parse_coordinate(diameter_row['CentreCoor'].values[0])
+            # 尋找距離(x,y)最近的'int number'列
+            int_rows:pd.DataFrame = group.dropna(subset=['Extracted_Int']).copy()
+            nearest_index:int = find_nearest('Extracted_Int', x, y, int_rows)
+            diameter:float = int_rows.iloc[nearest_index]['Extracted_Int']
+            type_data['Diameter'] = diameter
+            print(f"直徑: {diameter}")
+
+            ''' 4. 混凝土強度 '''
+            concrete_strength_rows:pd.DataFrame = group.dropna(subset=['Extracted_Concrete_strength']).copy()
+            if len(concrete_strength_rows) > 0:
+                concrete_strength:float = concrete_strength_rows['Extracted_Concrete_strength'].values[0]
+            else:
+                concrete_strength = 0
+                print("無法找到混凝土強度")
+            type_data['Concrete_strength'] = concrete_strength
+            print(f"混凝土強度: {concrete_strength}")
+
+            ''' 5. 主筋 & 箍筋 '''
+            section_row:pd.Series = group[group['Text'] == '剖 面']
+            if len(section_row) > 1:
+                print("找到多個剖面")
+            elif len(section_row) == 0:
+                print("未找到剖面")
+            else:
+                x, y, z = parse_coordinate(section_row['CentreCoor'].values[0])
+                # 尋找距離(x,y)最近的'main rebar'列
+                main_rebar_rows:pd.DataFrame = group.dropna(subset=['Extracted_Main_rebar_count']).copy()
+                nearest_index:int = find_nearest('Extracted_Main_rebar_count', x, y, main_rebar_rows)
+                main_rebar_count:int = main_rebar_rows.iloc[nearest_index]['Extracted_Main_rebar_count']
+                main_rebar_diameter:int = main_rebar_rows.iloc[nearest_index]['Extracted_Main_rebar_diameter']
+                type_data['Main_rebar'] = str(main_rebar_count) + '-D' + str(main_rebar_diameter)
+                print(f"主筋: {main_rebar_count} - D{main_rebar_diameter}")
+
+                # 尋找距離(x,y)最近的'stirrup rebar'列
+                stirrup_rebar_rows:pd.DataFrame = group.dropna(subset=['Extracted_Rebar_diameter']).copy()
+                nearest_index:int = find_nearest('Extracted_Rebar_diameter', x, y, stirrup_rebar_rows)
+                stirrup_rebar_diameter:int = stirrup_rebar_rows.iloc[nearest_index]['Extracted_Rebar_diameter']
+                stirrup_rebar_spacing:int = stirrup_rebar_rows.iloc[nearest_index]['Extracted_Rebar_spacing']
+                type_data['Stirrup_rebar'] = 'D' + str(stirrup_rebar_diameter) + '@' + str(stirrup_rebar_spacing)
+                print(f"箍筋: D{stirrup_rebar_diameter} @ {stirrup_rebar_spacing}")
+
+            ''' 6. 梁寬 & 梁長 '''
+            beam_row:pd.Series = group[group['Text'] == '擋土排樁繫梁詳圖']
+            if len(beam_row) > 1:
+                print("找到多個擋土排樁繫梁詳圖")
+            elif len(beam_row) == 0:
+                print("未找到擋土排樁繫梁詳圖")
+            else:
+                x, y, z = parse_coordinate(beam_row['CentreCoor'].values[0])
+                # 尋找距離(x,y)最近的'int number'列
+                int_rows:pd.DataFrame = group.dropna(subset=['Extracted_Int']).copy()
+                nearest_index:int = find_nearest('Extracted_Int', x, y, int_rows)
+                beam_width:float = int_rows.iloc[nearest_index]['Extracted_Int']
+                type_data['Tiebeam_width'] = beam_width
+                print(f"梁寬: {beam_width}")
+                
+                int_rotated_rows:pd.DataFrame = group.dropna(subset=['Extracted_Int']).copy()
+                int_rotated_rows = int_rotated_rows[int_rotated_rows['RotationAngle'] != '0.0']
+                nearest_index:int = find_nearest('Extracted_Int', x, y, int_rotated_rows)
+                beam_length:float = int_rotated_rows.iloc[nearest_index]['Extracted_Int']
+                type_data['Tiebeam_length'] = beam_length
+                print(f"梁長: {beam_length}")
+
+            response_dic[type_name] = type_data
 
         self.output_path = create_gui(response_dic, "Bored Pile Rebar")
 
@@ -167,10 +282,9 @@ class BoredPile_rebar(Base_rebar):
         self.save_to_xml(response_dic)
 
         # remove the pdf
-        os.remove(self.pdf_path)
+        os.remove(self.csv_path)
 
     def save_to_xml(self, response_dic):
-        print("資料萃取結果: ", response_dic)
         print("已將資料寫入xml檔案: ", self.output_path)
         # 檢查是否已經有xml檔案，若有則讀取，若無則創建
         tree, root = create_or_read_xml(self.output_path)
@@ -187,33 +301,34 @@ class BoredPile_rebar(Base_rebar):
                 pile = ET.SubElement(rebars, 'WorkItemType', description="PILE TYPE", TYPE=pile_type)
                 # 在 pile 底下建立 Rowpile 子節點
                 Rowpile = ET.SubElement(pile, 'Rowpile', description="排樁")
-                # 在 pile 底下建立 eam子 節點
+                # 在 pile 底下建立 Beam子 節點
                 Beam = ET.SubElement(pile, 'Beam', description="繫樑")
                 for key, value in pile_info.items():
-                    if key == "TieBeam":
+                    if key == "Tiebeam_width":
                         TieBeam_W = ET.SubElement(Beam, 'Width', description="繫樑寬")
                         TieBeam_W_value = ET.SubElement(TieBeam_W, 'Value', unit="mm")
                         TieBeam_W_value.text = str(value)
+                    elif key == "Tiebeam_length":
                         TieBeam_H = ET.SubElement(Beam, 'Length', description="繫樑長")
                         TieBeam_H_value = ET.SubElement(TieBeam_H, 'Value', unit="mm")
                         TieBeam_H_value.text = str(value)
-                    elif key == "diameter":
+                    elif key == "Diameter":
                         diameter = ET.SubElement(Rowpile, 'Diameter', description="直徑")
                         diameter_value = ET.SubElement(diameter, 'Value', unit="mm")
                         diameter_value.text = str(value)
-                    elif key == "depth":
+                    elif key == "Depth":
                         depth = ET.SubElement(Rowpile, 'Height', description="深度")
-                        depth_value = ET.SubElement(depth, 'Value', unit="mm")
+                        depth_value = ET.SubElement(depth, 'Value', unit="m")
                         depth_value.text = str(value)
-                    elif key == "ShearRebar":
+                    elif key == "Main_rebar":
                         ShearRebar = ET.SubElement(Rowpile, 'ShearRebar', description="剪力筋")
                         ShearRebar_value = ET.SubElement(ShearRebar, 'Value')
                         ShearRebar_value.text = str(value)
-                    elif key == "Stirrup":
+                    elif key == "Stirrup_rebar":
                         Stirrup = ET.SubElement(Rowpile, 'Stirrup', description="箍筋")
                         Stirrup_value = ET.SubElement(Stirrup, 'Value')
                         Stirrup_value.text = str(value)
-                    elif key == "ConcreteStrength":
+                    elif key == "Concrete_strength":
                         # 在 Rowpile 底下建立 Concrete 子節點
                         Concrete = ET.SubElement(Rowpile, 'Concrete', description="混凝土")
                         ConcreteStrength = ET.SubElement(Concrete, 'Strength', description="混凝土強度")
@@ -222,161 +337,6 @@ class BoredPile_rebar(Base_rebar):
         
         # 寫入xml檔案，utf-8編碼
         tree.write(self.output_path, encoding="utf-8")
-    
-    def extract_data(self, img):
-            
-        # init the result dic
-        single_type_result = {
-            "type": None,
-            "diameter": None,
-            "depth": None,
-            "TieBeam": [],
-            "ShearRebar": None,
-            "Stirrup": None,
-            "ConcreteStrength": None
-        }
-
-        # image preprocessing
-        img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        _, img_th = cv2.threshold (img_gray, 240, 255, 0)
-
-        # OCR
-        bounds = self.ocr_tool.ocr(img_th)
-
-        # rotated image clockwise 90 degree
-        img_rotated = cv2.rotate(img_th, cv2.ROTATE_90_CLOCKWISE)
-        bounds_rotated = self.ocr_tool.ocr(img_rotated)
-
-        # extract data from bounds
-        TieBeam = None # 格式為 [x, y]
-        BoardPileDetial = None # 格式為 [x, y]
-        Section = None # 格式為 [x, y]
-        listOfNumbers = [] # 儲存格式為 [數字, [x, y], index]
-        listOfShearRebars = [] # 儲存格式為 [文字, [x, y], index]
-        listOfstirrups = [] # 儲存格式為 [文字, [x, y], index]
-        listOfstrength = [] # 儲存格式為 [文字, [x, y], index
-
-        for i, bound in enumerate(bounds):
-            # 找繫樑標註關鍵字
-            if bound[1].find("TIE BEAM FOR BORED PILE") != -1:
-                TieBeam = bound[0][0]
-            # 找出排樁標註關鍵字
-            elif bound[1].find("BORED PILE DETAIL") != -1:
-                BoardPileDetial = bound[0][0]
-            # 找出排樁斷面標註關鍵字
-            elif bound[1].find("SECTION") != -1:
-                area = (bound[0][0][0] - bound[0][1][0]) * (bound[0][0][1] - bound[0][2][1])
-                if area > 15000:
-                    Section = bound[0][0]
-
-
-            # 找出排樁型式
-            match = re.match(r'^BORED PILE TYPE ([A-Z]\d+)$', bound[1])
-            if match:
-                extracted = match.group(1)
-                single_type_result["type"] = extracted
-
-            # 找出剪力筋號數
-            match = re.match(r'D(\d+)@(\d+)', bound[1])
-            if match:
-                listOfShearRebars.append([bound[1], bound[0][0], i])
-
-            # 找出挎筋號數
-            match = re.match(r'(\d+)-D(\d+)', bound[1])
-            if match:
-                listOfstirrups.append([bound[1], bound[0][0], i])
-
-            # 找出混凝土強度
-            match = re.match(r'(\d+) kgf.*', bound[1])
-            if match:
-                listOfstrength.append([int(match.group(1)), bound[0][0], i])
-
-            # 找出可以被轉換成int的數字 (預設是標註的那些數字)
-            try:
-                listOfNumbers.append([int(bound[1]), bound[0][0], i])
-            except:
-                pass
-
-
-        # according to the x,y points of bored pile detail, find the most closest int number with using listOfNumbers
-        if TieBeam == None or listOfNumbers == []:
-            print("TieBeam or listOfNumbers is None")
-            single_type_result["TieBeam"] = 'None'
-        else:
-            min_distance = math.inf
-            TeiBeam_index = -1
-            for i in range(len(listOfNumbers)):
-                distance = math.sqrt((listOfNumbers[i][1][0] - TieBeam[0])**2 + (listOfNumbers[i][1][1] - TieBeam[1])**2)
-                if distance < min_distance:
-                    min_distance = distance
-                    TeiBeam_index = i
-
-            single_type_result["TieBeam"] = listOfNumbers[TeiBeam_index][0]
-
-        if BoardPileDetial == None or listOfNumbers == []:
-            print("BoardPileDetial or listOfNumbers is None")
-            single_type_result["diameter"] = 'None'
-        else:
-            min_distance = math.inf
-            BoardPile_index = -1
-            for i in range(len(listOfNumbers)):
-                distance = math.sqrt((listOfNumbers[i][1][0] - BoardPileDetial[0])**2 + (listOfNumbers[i][1][1] - BoardPileDetial[1])**2)
-                if distance < min_distance:
-                    min_distance = distance
-                    BoardPile_index = i
-
-            single_type_result["diameter"] = listOfNumbers[BoardPile_index][0]
-
-        if Section == None or listOfShearRebars == []:
-            print("Section or listOfShearRebars is None")
-            single_type_result["ShearRebar"] = 'None'
-        else:
-            min_distance = math.inf
-            ShearRebar_index = -1
-            for i in range(len(listOfShearRebars)):
-                distance = math.sqrt((listOfShearRebars[i][1][0] - Section[0])**2 + (listOfShearRebars[i][1][1] - Section[1])**2)
-                if distance < min_distance:
-                    min_distance = distance
-                    ShearRebar_index = i
-
-            single_type_result["ShearRebar"] = listOfShearRebars[ShearRebar_index][0]
-
-        if Section == None or listOfstirrups == []:
-            print("Section or listOfstirrups is None")
-            single_type_result["Stirrup"] = 'None'
-        else:
-            min_distance = math.inf
-            Stirrup_index = -1
-            for i in range(len(listOfstirrups)):
-                distance = math.sqrt((listOfstirrups[i][1][0] - Section[0])**2 + (listOfstirrups[i][1][1] - Section[1])**2)
-                if distance < min_distance:
-                    min_distance = distance
-                    Stirrup_index = i
-
-            single_type_result["Stirrup"] = listOfstirrups[Stirrup_index][0]
-
-        if Section == None or listOfstrength == []:
-            print("Section or listOfstrength is None")
-            single_type_result["ConcreteStrength"] = 'None'
-        else:
-            min_distance = math.inf
-            ConcreteStrength_index = -1
-            for i in range(len(listOfstrength)):
-                distance = math.sqrt((listOfstrength[i][1][0] - Section[0])**2 + (listOfstrength[i][1][1] - Section[1])**2)
-                if distance < min_distance:
-                    min_distance = distance
-                    ConcreteStrength_index = i
-
-            single_type_result["ConcreteStrength"] = listOfstrength[ConcreteStrength_index][0]
-
-        # extract data from bounds_rotated
-        try:
-            single_type_result["depth"] = int(bounds_rotated[0][1])
-        except:
-            print("depth is None")
-            single_type_result["depth"] = 'None'
-
-        return single_type_result["type"], single_type_result
 
 
 class Diaphragm_rebar():
