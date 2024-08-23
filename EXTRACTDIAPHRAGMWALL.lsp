@@ -2228,7 +2228,7 @@
     (setq target_file (vl-directory-files dirpath "*.dwg" 1))
     (setq *layoutname_list* '())
     (preloopp_for_all_folder dirpath dwgname_list)
-    (setq command (strcat "dist\\main.exe -t BoredPile -d rebar -p " dirpath "\\FullText.csv"))
+    (setq command (strcat "dist\\main.exe -t BoredPile -d rebar -c " dirpath "\\FullText.csv"))
     (startapp command)
   )
 )
