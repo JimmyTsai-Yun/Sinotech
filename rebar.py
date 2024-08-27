@@ -1087,6 +1087,14 @@ class Diaphragm_rebar():
             Depth_value = ET.SubElement(Depth, "Value", unit="m")
             Depth_value.text = str(data_dic['Depth'])
 
+            EmptyDepth = ET.SubElement(DiaphragmWall, "EmptyDepth", description="空打深度")
+            EmptyDepth_value = ET.SubElement(EmptyDepth, "Value", unit="m")
+            EmptyDepth_value.text = str(data_dic['Empty_depth'])
+
+            RealDepth = ET.SubElement(DiaphragmWall, "RealDepth", description="實打深度")
+            RealDepth_value = ET.SubElement(RealDepth, "Value", unit="m")
+            RealDepth_value.text = str(data_dic['Real_depth'])
+
             Thickness = ET.SubElement(DiaphragmWall, "Thickness", description="厚度")
             Thickness_value = ET.SubElement(Thickness, "Value", unit="mm")
             Thickness_value.text = str(data_dic['Thickness'])
