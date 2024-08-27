@@ -1156,9 +1156,9 @@ class Diaphragm_rebar():
                 Type_value = ET.SubElement(Type, "Value", unit="mm")
 
                 if rebar_info['Sh_Spac'] == None:
-                    Type_value.text = f"{rebar_info['Sv_Dia']}Sv {rebar_info['Sv_Spac']}"
+                    Type_value.text = f"D{rebar_info['Sv_Dia']}Sv {rebar_info['Sv_Spac']}"
                 else:
-                    Type_value.text = f"{rebar_info['Sh_Dia']}Sh {rebar_info['Sh_Spac']}Sv {rebar_info['Sv_Spac']}"
+                    Type_value.text = f"D{rebar_info['Sh_Dia']}Sh {rebar_info['Sh_Spac']}Sv {rebar_info['Sv_Spac']}"
 
                 StartDepth = ET.SubElement(Rebar, "StartDepth", description="開起深度")
                 StartDepth_value = ET.SubElement(StartDepth, "Value", unit="m")
