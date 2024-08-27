@@ -21,6 +21,49 @@ import threading
 import time
 import re
 from typing import Tuple
+import csv
+import pandas as pd
+
+# 定義自定義解析器
+def custom_csv_parser(file_path, encoding='Big5'):
+    rows = []
+    with open(file_path, encoding=encoding) as file:
+        reader = csv.reader(file)
+        for row in reader:
+            if len(row) > 8:
+                row[7] = ', '.join(row[7:])
+                row = row[:8]
+            row[-1] = row[-1].rstrip(', ')
+            rows.append(row)
+    return rows
+
+def parse_coordinate(coord_str: str) -> list:
+    # 使用正則表達式提取坐標值
+    match = re.match(r'\(([\d.]+)\s+([\d.]+)\s+([\d.]+)\)', coord_str)
+    if match:
+        return [float(match.group(1)), float(match.group(2)), float(match.group(3))]
+    else:
+        raise ValueError(f"無法解析坐標: {coord_str}")
+    
+def find_nearest(candidate_columns: str, x: float, y: float, df: pd.DataFrame) -> int:
+
+    # 選擇有效的候選行（非空值）
+    candidate_rows = df[df[candidate_columns].notna()]
+
+    # 解析候選行的坐標
+    candidate_coords = np.array([parse_coordinate(coord) for coord in candidate_rows['CentreCoor']])
+
+    # 創建目標坐標
+    target_coords = np.array([x, y])
+
+    # 計算距離
+    distances = np.sqrt(np.sum((candidate_coords[:, :2] - target_coords)**2, axis=1))
+
+    # 找出最近的點
+    nearest_index = np.argmin(distances)
+
+    # 返回最近點的相應列
+    return nearest_index
 
 def set_working_directory() -> str:
     """

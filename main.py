@@ -16,6 +16,9 @@ def main():
     parser.add_argument("-u", "--use_azure", dest="use_azure", help="Use GPT-4", default=False, action='store_true')
     # A optional argument for the pdf2 path (plan drawing may have 2 pdfs)
     parser.add_argument("-p2", "--pdf2_path", dest="pdf2_path", help="The path to the second pdf", default=".\\-Layout2.pdf")
+    parser.add_argument("-c2", "--csv2_path", dest="vertical_path", help="The path to the second csv", default="None")
+    parser.add_argument("-c3", "--csv3_path", dest="v_helper_path", help="The path to the third csv", default="None")
+    parser.add_argument("-c4", "--csv4_path", dest="sh_helper_path", help="The path to the fourth csv", default="None")
 
     args = parser.parse_args()
 
@@ -41,8 +44,14 @@ def main():
     try:
         target_class = class_dictionary[args.task][args.drawing_type]
         if target_class is not None:
-            object = target_class(pdf_path=args.pdf_path, csv_path=args.csv_path, 
-                                  output_path=args.output_path, use_azure=args.use_azure, pdf2_path=args.pdf2_path)
+            object = target_class(pdf_path=args.pdf_path, 
+                                  csv_path=args.csv_path, 
+                                  output_path=args.output_path, 
+                                  use_azure=args.use_azure, 
+                                  pdf2_path=args.pdf2_path, 
+                                  vertical_path=args.vertical_path,
+                                  v_helper_path=args.v_helper_path,
+                                  sh_helper_path=args.sh_helper_path)
             if hasattr(object, 'run'):
                 
                 object.run()
