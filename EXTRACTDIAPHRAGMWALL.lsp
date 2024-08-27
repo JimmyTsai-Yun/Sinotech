@@ -1677,9 +1677,9 @@
     (setq dwgname_list (cdr dwgname_list))
   )
   ;(command "-Publish" (strcat dirpath "\\" "PUBLIST.dsd") )
-  (_writecsv "W" (strcat dirpath "\\Helper Line Info.csv") helper_lst)
-  (_writecsv "W" (strcat dirpath "\\Vertical Line Info.csv") line_lst)
-  (_writecsv "W" (strcat dirpath "\\Text Info.csv") text_lst)
+  (_writecsv "W" (strcat dirpath "\\helper_line.csv") helper_lst)
+  (_writecsv "W" (strcat dirpath "\\vertical_line.csv") line_lst)
+  ; (_writecsv "W" (strcat dirpath "\\Text Info.csv") text_lst)
   
   (setq *layoutname_list* layoutname_list_backup)
   ;(makedsd dirpath dwgname_list_2 "-Layout1_2_ref.pdf" "PUBLIST_2.dsd")
@@ -1859,10 +1859,10 @@
   )
   
   ;(command "-Publish" (strcat dirpath "\\" "PUBLIST_2.dsd") )
-  (_writecsv "W" (strcat dirpath "\\Full Text Info.csv") full_text_lst)
-  (_writecsv "W" (strcat dirpath "\\SH Text Info.csv") text_lst2)
-  (_writecsv "W" (strcat dirpath "\\SH Line Info.csv") line_lst2)
-  (_writecsv "W" (strcat dirpath "\\SH Helper Line Info.csv") helper_lst2)
+  (_writecsv "W" (strcat dirpath "\\FullText.csv") full_text_lst)
+  ; (_writecsv "W" (strcat dirpath "\\SH Text Info.csv") text_lst2)
+  ; (_writecsv "W" (strcat dirpath "\\SH Line Info.csv") line_lst2)
+  (_writecsv "W" (strcat dirpath "\\Sh_helper.csv") helper_lst2)
   
   (setq *layoutname_list* layoutname_list_backup)
   ;(makedsd dirpath dwgname_list_3 "-Layout1_2.pdf" "PUBLIST_3.dsd")
@@ -2140,7 +2140,9 @@
     (setq target_layer_5 (nth 2 target_layer_small_2))
     (setq target_file (vl-remove-if ''( (item) (not (or (member item target_layer_0) (member item target_layer_1) (member item target_layer_2) (member item target_layer_3) (member item target_layer_4) (member item target_layer_5)))) target_file))
     (mainloop4 dirpath target_file target_file target_layer_small_1 target_layer_small_2)
-    (startapp "dist\\Data Process - Rebar Drawings.exe" dirpath)
+    (setq command (strcat "dist\\main.exe -t Diaphragm -d rebar -c " dirpath "\\FullText.csv -c2 " dirpath "\\vertical_line.csv -c3 " dirpath "\\helper_line.csv -c4 " dirpath "\\Sh_helper.csv"))
+    ;(startapp "dist\\Data Process - Rebar Drawings.exe" dirpath)
+    (startapp command)
   ))
 
 ; ------------------------------------------------For Sheet Pile ------------------------------------------------------

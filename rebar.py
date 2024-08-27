@@ -960,7 +960,7 @@ class Diaphragm_rebar():
 
             # 按照順序將 rotated_rebar_rows 填入 Sv 欄位，若遇到不夠的 rebar 則用上一個 rebar 補充
             # 由大到小排序
-            rotated_rebar_rows = rotated_rebar_rows.sort_values('Y', ascending=False)
+            rotated_rebar_rows = rotated_rebar_rows.sort_values('Y')
             copy_time_count = len(Deep_rows) - len(rotated_rebar_rows)
             if copy_time_count > 0:
                 additional_rows = pd.concat([rotated_rebar_rows.iloc[[0]]] * copy_time_count, ignore_index=True)
