@@ -576,7 +576,6 @@ class Diaphragm_rebar():
         rows = custom_csv_parser(self.rebar_path)
         columns = ["FileName", "EntityName", "ObjectType", "RotationAngle", "CentreCoor", "Height", "Width", "Text"]
         df = pd.DataFrame(rows[1:], columns=columns)
-        print(self.v_helper_path)
         df_helper = pd.read_csv(self.v_helper_path, encoding='Big5')
         df_vertical = pd.read_csv(self.vertical_path, encoding='Big5')
         df_sh_helper = pd.read_csv(self.sh_helper_path, encoding='Big5')
@@ -988,7 +987,7 @@ class Diaphragm_rebar():
                     Deep_rows.at[i, 'Sh_Dia'] = unique_dia
                     Deep_rows.at[i, 'Sh_Spac'] = unique_spac
 
-            print(Deep_rows[['Start_depth', 'End_depth', 'Sv_Dia', 'Sv_Spac', 'Sh_Dia', 'Sh_Spac']])
+            # print(Deep_rows[['Start_depth', 'End_depth', 'Sv_Dia', 'Sv_Spac', 'Sh_Dia', 'Sh_Spac']])
             
             
             # 存儲 Sv 鋼筋

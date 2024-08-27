@@ -1523,7 +1523,7 @@
   (setq helper_lst2 '(("FileName" "EntityName" "ObjectType" "BasePoint" "UpLeftPoint" "DownRightPoint")))
   
   (setq layoutname_list_backup *layoutname_list*)
-  (makedsd dirpath dwgname_list "-Layout1.pdf" "PUBLIST.dsd")
+  ;(makedsd dirpath dwgname_list "-Layout1.pdf" "PUBLIST.dsd")
   (while dwgname_list
     (setq dwgname (car dwgname_list))
     (vl-load-com)
@@ -1676,13 +1676,13 @@
     (vla-close doc)
     (setq dwgname_list (cdr dwgname_list))
   )
-  (command "-Publish" (strcat dirpath "\\" "PUBLIST.dsd") )
+  ;(command "-Publish" (strcat dirpath "\\" "PUBLIST.dsd") )
   (_writecsv "W" (strcat dirpath "\\Helper Line Info.csv") helper_lst)
   (_writecsv "W" (strcat dirpath "\\Vertical Line Info.csv") line_lst)
   (_writecsv "W" (strcat dirpath "\\Text Info.csv") text_lst)
   
   (setq *layoutname_list* layoutname_list_backup)
-  (makedsd dirpath dwgname_list_2 "-Layout1_2_ref.pdf" "PUBLIST_2.dsd")
+  ;(makedsd dirpath dwgname_list_2 "-Layout1_2_ref.pdf" "PUBLIST_2.dsd")
   (while dwgname_list_2
     (setq dwgname (car dwgname_list_2))
     (vl-load-com)
@@ -1858,36 +1858,36 @@
     (setq dwgname_list_2 (cdr dwgname_list_2))
   )
   
-  (command "-Publish" (strcat dirpath "\\" "PUBLIST_2.dsd") )
+  ;(command "-Publish" (strcat dirpath "\\" "PUBLIST_2.dsd") )
   (_writecsv "W" (strcat dirpath "\\Full Text Info.csv") full_text_lst)
   (_writecsv "W" (strcat dirpath "\\SH Text Info.csv") text_lst2)
   (_writecsv "W" (strcat dirpath "\\SH Line Info.csv") line_lst2)
   (_writecsv "W" (strcat dirpath "\\SH Helper Line Info.csv") helper_lst2)
   
   (setq *layoutname_list* layoutname_list_backup)
-  (makedsd dirpath dwgname_list_3 "-Layout1_2.pdf" "PUBLIST_3.dsd")
-  (while dwgname_list_3
-    (setq dwgname (car dwgname_list_3))
-    (vl-load-com)
-    (setq doc (vla-Open (vla-get-documents (vlax-get-acad-object)) (strcat dirpath "\\" dwgname)))
-    (vla-StartUndoMark doc)
+  ;(makedsd dirpath dwgname_list_3 "-Layout1_2.pdf" "PUBLIST_3.dsd")
+  ; (while dwgname_list_3
+  ;   (setq dwgname (car dwgname_list_3))
+  ;   (vl-load-com)
+  ;   (setq doc (vla-Open (vla-get-documents (vlax-get-acad-object)) (strcat dirpath "\\" dwgname)))
+  ;   (vla-StartUndoMark doc)
     
-    (if (and (member dwgname rebar_file2) (member dwgname text_file2) (member dwgname pointer_file2))
-      (progn
-        (setq text_file_index2 (vl-position dwgname text_file2))
-        (setq rebar_file_index2 (vl-position dwgname rebar_file2))
-        (setq pointer_file_index2 (vl-position dwgname pointer_file2))
+  ;   (if (and (member dwgname rebar_file2) (member dwgname text_file2) (member dwgname pointer_file2))
+  ;     (progn
+  ;       (setq text_file_index2 (vl-position dwgname text_file2))
+  ;       (setq rebar_file_index2 (vl-position dwgname rebar_file2))
+  ;       (setq pointer_file_index2 (vl-position dwgname pointer_file2))
         
-        (turnon_alllayer doc )
-      )
-    )
-    (vla-purgeall doc)
-    (vla-EndUndoMark doc)
-    (vla-save doc)
-    (vla-close doc)
-    (setq dwgname_list_3 (cdr dwgname_list_3))
-  )
-  (command "-Publish" (strcat dirpath "\\" "PUBLIST_3.dsd") )
+  ;       (turnon_alllayer doc )
+  ;     )
+  ;   )
+  ;   (vla-purgeall doc)
+  ;   (vla-EndUndoMark doc)
+  ;   (vla-save doc)
+  ;   (vla-close doc)
+  ;   (setq dwgname_list_3 (cdr dwgname_list_3))
+  ; )
+  ;(command "-Publish" (strcat dirpath "\\" "PUBLIST_3.dsd") )
 )
 
 (defun output_pile_info(dirpath dwgname_list target_layer)
