@@ -18,7 +18,7 @@ class Base_structure():
             self.client = construct_GPT4()
 
     # 定義自定義解析器
-    def custom_csv_parser(self, file_path, encoding='Big5'):
+    def custom_csv_parser(self, file_path, encoding='Big5HKSCS'):
         rows = []
         with open(file_path, encoding=encoding) as file:
             reader = csv.reader(file)
