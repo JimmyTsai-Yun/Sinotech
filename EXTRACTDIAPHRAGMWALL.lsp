@@ -1,6 +1,7 @@
 (load "utils.lsp")
 ;------------------------------------------LOOP EVERY FILES------------------------------------------
 
+; 鋼板樁平面圖、排樁平面圖 UI函數(舊版)
 (defun preloop_for_selectlayer_folder (dirpath dwgname_list)
   (setq collectedlayer '())
   (setq collectedlayer_file '())
@@ -281,6 +282,7 @@
 
 )
 
+; 鋼板樁立面、配筋，排樁配筋 UI、處理函數
 (defun preloopp_for_all_folder (dirpath dwgname_list)
   (setq full_text_lst '(("FileName" "EntityName" "ObjectType" "RotationAngle" "CentreCoor" "Height" "Width" "Text")))
   (while dwgname_list
@@ -341,6 +343,159 @@
   (_writecsv "W" (strcat dirpath "\\FullText.csv") full_text_lst)
 )
 
+(defun preloop_for_plan_eval_drawing(dirpath dwgname_list / wall_file wall_layer)
+  (setq collectedlayer '()) ; 每張圖為一單位，存放圖的圖層名稱
+  (setq collectedlayer_file '()) ; 存放圖檔名稱
+  (setq dwgname_list_shown dwgname_list)
+  (while dwgname_list
+    (setq dwgname (car dwgname_list))
+    (vl-load-com)
+    (setq doc (vla-Open (vla-get-documents (vlax-get-acad-object)) (strcat dirpath "\\" dwgname)))
+    (vla-StartUndoMark doc) 
+    (setq tempcollectedlayer '())
+    (vlax-for layer (vla-get-layers doc)
+        (setq tempcollectedlayer (cons (vla-get-name layer) tempcollectedlayer))
+    )
+    (setq tempcollectedlayer (reverse tempcollectedlayer))
+    (vla-purgeall doc)
+    (vla-EndUndoMark doc)
+    (vla-save doc)
+    (vla-close doc)
+    (setq collectedlayer_file (append collectedlayer_file (list dwgname )))
+    (setq collectedlayer (append collectedlayer (list tempcollectedlayer)))
+    (setq dwgname_list (cdr dwgname_list))
+  )
+  (setq collectedlayer_wall collectedlayer)
+  (setq dcl_id (load_dialog "dcl\\plan_selection.dcl")) ; change directory path to known location
+  (if (not (new_dialog "plan_selection" dcl_id))
+  (exit)
+  )
+
+  ; 初始化 source file， 並設定 action_tile
+  (start_list "source_file")
+  (foreach itm dwgname_list_shown (add_list itm))
+  (end_list)
+  (action_tile "source_file" 
+    (vl-prin1-to-string
+      '(progn
+        (setq selected_source_file_index (atoi (get_tile "source_file")))
+        (start_list "source_layer")
+        (foreach itm (nth selected_source_file_index collectedlayer) (add_list itm))
+        (end_list)
+        (set_tile "source_layer" "0")
+        (set_tile "source_layer_slider" "0")
+      )
+    )
+  )
+
+  ; 初始化 all layer， 並設定 action_tile
+  (start_list "source_layer")
+  (foreach itm '() (add_list itm))
+  (end_list)
+  (action_tile "source_layer" "")
+
+  ; 初始化 selected file， 並設定 action_tile
+  (action_tile "selected_file" 
+    (vl-prin1-to-string
+      '(progn
+        (setq added_index (atoi (get_tile "selected_file")))
+        (start_list "selected_layer")
+        (foreach itm (nth added_index wall_layer) (add_list itm))
+        (end_list)
+        (set_tile "selected_layer_slider" "0")
+      )
+    )
+  )
+
+  (action_tile "add_layer"
+    (vl-prin1-to-string
+          '(progn
+            (setq selected_source_file_index (atoi (get_tile "source_file")))
+            (setq selected_filename (nth selected_source_file_index dwgname_list_shown))
+            (if (boundp 'wall_file)
+              (progn
+                (if (not (member selected_filename wall_file))
+                  (progn
+                  (setq wall_file (append wall_file (list selected_filename)))
+                  (setq wall_layer (append wall_layer (list'())))
+                  )
+                )
+              )
+              (progn
+                (setq wall_file (list selected_filename))
+                (setq wall_layer (list'()))
+              ))
+            (start_list "selected_file")
+              (foreach itm wall_file (add_list itm))
+            (end_list)
+            (setq added_source_file_index (vl-position selected_filename wall_file))
+            (set_tile "selected_file" (vl-princ-to-string added_source_file_index))
+            
+            (setq temp_collectedlayer_wall  (nth selected_source_file_index collectedlayer_wall)) ; 獲取選中的圖的圖層名稱，等一下要透過扣除被選中的圖層名稱進行更新
+            (setq temp_wall_layer  (nth added_source_file_index wall_layer)) ; 獲取選中的圖的在記錄中的圖層名稱(空列表)，等一下要透過新增被選中的圖層名稱進行更新
+            (mapcar 'dclist '("source_layer" "selected_layer") ; 更新 source_layer 和 selected_layer 的顯示內容              <---\
+                (mapcar 'set '(temp_collectedlayer_wall temp_wall_layer) ; 更新 temp_collectedlayer_wall 和 temp_wall_layer  ---/
+                    (shiftitems (read (strcat "(" (get_tile "source_layer") ")")) temp_collectedlayer_wall temp_wall_layer)
+                ))
+            (set_tile "source_layer_slider" "0")
+            (set_tile "selected_file_slider" "0")
+            (set_tile "selected_layer_slider" "0")
+            (setq collectedlayer_wall (SubstNth temp_collectedlayer_wall selected_source_file_index collectedlayer_wall)) ; 將 temp_collectedlayer_wall 更新到 collectedlayer_wall
+            (setq wall_layer (SubstNth temp_wall_layer added_source_file_index wall_layer)) ; 將 temp_wall_layer 更新到 wall_layer
+            )))
+
+  (action_tile "remove_layer"
+    (vl-prin1-to-string
+      '(progn
+        (setq selected_remove_file_index (atoi (get_tile "selected_file")))
+        (setq selected_remove_filename (nth selected_remove_file_index wall_file))
+        (setq selected_file_index (vl-position selected_remove_filename dwgname_list_shown))
+        (setq temp_collectedlayer_wall  (nth selected_file_index collectedlayer_wall))
+        (setq temp_wall_layer  (nth selected_remove_file_index wall_layer))
+        (mapcar 'dclist '("selected_layer" "source_layer")
+          (mapcar 'set '(temp_wall_layer temp_collectedlayer_wall)
+              (shiftitems  (read (strcat "(" (get_tile "selected_layer") ")")) temp_wall_layer temp_collectedlayer_wall)
+          ))
+        (setq collectedlayer_wall (SubstNth temp_collectedlayer_wall selected_file_index collectedlayer_wall))
+        (setq wall_layer (SubstNth temp_wall_layer selected_remove_file_index wall_layer))
+        
+        (set_tile "source_layer" (itoa (vl-position selected_remove_filename dwgname_list_shown)))
+        (set_tile "source_layer_slider" "0")
+        (set_tile "selected_layer_slider" "0")
+        
+        (if (null temp_wall_layer)
+          (progn
+            (setq wall_file (RemoveNth selected_remove_file_index wall_file))
+            (setq wall_layer (RemoveNth selected_remove_file_index wall_layer))
+            (start_list "selected_file")
+            (foreach itm wall_file (add_list itm))
+            (end_list)
+            (set_tile "selected_file_slider" "0")
+          ))
+        )))
+  (action_tile "source_file_slider" (vl-prin1-to-string '(slider_cut_restore_string "source_file_slider" "source_file" dwgname_list_shown 3 "   ")))
+  (action_tile "source_layer_slider" (vl-prin1-to-string '(slider_cut_restore_string "source_layer_slider" "source_layer" (nth (atoi (get_tile "source_file")) collectedlayer_wall) 3 "   ")))
+  (action_tile "selected_file_slider" (vl-prin1-to-string '(slider_cut_restore_string "selected_file_slider" "selected_file" wall_file 3 "   ")))
+  (action_tile "selected_layer_slider" (vl-prin1-to-string '(if (not (equal wall_file nil))
+      (slider_cut_restore_string "selected_file_slider" "selected_file" (nth (atoi (get_tile "selected_file")) wall_layer) 3 "   "))
+      ))
+
+  (action_tile "accept"
+  (vl-prin1-to-string
+          '(progn
+            (done_dialog)
+  )))
+  
+  (action_tile "cancel"
+  (strcat
+  "(quit)"
+  ))
+  (start_dialog)
+  (unload_dialog dcl_id)
+  (setq target_layer (list wall_file wall_layer))
+)
+
+; 連續壁平面、立面圖 UI函數(舊版)
 (defun preloop (dirpath dwgname_list / text_file wall_file text_layer wall_layer)
   (setq collectedlayer '())
   (setq collectedlayer_file '())
@@ -387,6 +542,7 @@
   (exit)
   )
     
+  ; 初始化 source wall， 並設定 action_tile 
   (start_list "source_wall")
   (foreach itm dwgname_list_shown (add_list itm))
   (end_list)
@@ -519,6 +675,7 @@
               ))
             )))
 
+
   (action_tile "add_text"
       (vl-prin1-to-string
         '(progn
@@ -619,6 +776,7 @@
   (setq target_layer (list wall_file text_file wall_layer text_layer))
 )
 
+; 連續壁配筋圖 UI函數(舊版)(不會更動)
 (defun preloop4 (dirpath dwgname_list / text_file wall_file pointer_file text_layer wall_layer pointer_layer text_file_2 wall_file_2 pointer_file_2 text_layer_2 wall_layer_2 pointer_layer_2)
   (setq collectedlayer '())
   (setq collectedlayer_file '())
@@ -1381,6 +1539,7 @@
   (set_tile listbox_name (itoa selected_index))
 )
 
+; 連續壁平面圖 處理函數(舊版)
 (defun mainloop1 (dirpath dwgname_list target_layer)
   (setq wall_file (nth 0 target_layer))
   (setq text_file (nth 1 target_layer))
@@ -1421,6 +1580,7 @@
   (_writecsv "w" (strcat dirpath "\\Text Info.csv") text_lst)
 )
 
+; 連續壁立面圖 處理函數(舊版)
 (defun mainloop2 (dirpath dwgname_list target_layer)
   (setq wall_file (nth 0 target_layer))
   (setq text_file (nth 1 target_layer))
@@ -1458,6 +1618,7 @@
   (_writecsv "w" (strcat dirpath "\\Text info.csv") text_lst)
 )
 
+; 結構一般說明 處理函數
 (defun mainloop3 (dirpath dwgname_list)
   (setq full_text_lst '(("FileName" "EntityName" "ObjectType" "RotationAngle" "CentreCoor" "Height" "Width" "Text")))
   (while dwgname_list
@@ -1542,6 +1703,7 @@
 ;   (vla-close doc)
 ; )
 
+; 連續壁配筋圖 處理函數
 (defun mainloop4 (dirpath dwgname_list dwgname_list_2 target_layer1 target_layer2 )
   (setq dwgname_list_3 dwgname_list_2)
   (setq rebar_file (nth 0 target_layer1))
@@ -2129,6 +2291,7 @@
     (setq dwgname_list (vl-directory-files dirpath "*.dwg" 1)) 
     (setq target_file (vl-directory-files dirpath "*.dwg" 1))
     (setq *layoutname_list* '())
+    (setq target_layer (preloop_for_plan_eval_drawing dirpath dwgname_list))
     (setq target_layer (preloop dirpath dwgname_list))
     (setq target_layer_0 (nth 0 target_layer))
     (setq target_layer_1 (nth 1 target_layer))
