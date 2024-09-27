@@ -2096,6 +2096,79 @@
   ;(command "-Publish" (strcat dirpath "\\" "PUBLIST_3.dsd") )
 )
 
+(defun mainloop_for_Dia_plan_eval (dirpath dwgname_list target_layer)
+  (setq wall_file (nth 0 target_layer)) ; 範例 (0 1 2 3 4 5)
+  (setq wall_layer (nth 1 target_layer)) ; 範例 ((s1, s2, s3) (s4, s5, s6))
+  ;; 初始化一個空列表來存儲符合條件的聚合線頂點，並初始化CSV標題
+  (setq full_list '(("FileName" "EntityName" "Layer" "ID" "Bulge" "X" "Y")))
+
+  (princ "\nStart to extract data from drawings...")
+
+  (while wall_file
+    (setq dwgname (car wall_file))
+    (vl-load-com)
+    (setq doc (vla-Open (vla-get-documents (vlax-get-acad-object)) (strcat dirpath "\\" dwgname)))
+    (vla-StartUndoMark doc)
+    (setq ss (vla-get-modelspace doc))
+
+    (setq wall_layer_index (vl-position dwgname wall_file))
+    (setq wall_layer_name_list (nth wall_layer_index wall_layer)) ;(s1, s2, s3)
+
+    ;; 初始化 ID 計數器
+    (setq id_counter 1)
+
+    (princ (strcat "\nProcessing " dwgname "..."))
+    (princ wall_layer_name_list)
+
+    (vlax-for obj ss 
+      (setq x (vlax-vla-object->ename obj)) ; 獲取圖元名稱
+      (setq obj_name (vla-get-objectname obj)) ; 獲取物件名稱
+      (setq obj_layer (vla-get-layer obj)) ; 獲取物件的圖層名稱
+      
+      ;; 如果物件是聚合線且圖層為"TYPE_S1"
+      ;; 遍歷多段線的頂點
+      (if (and (eq obj_name "AcDbPolyline") (member obj_layer wall_layer_name_list))
+        (progn
+          ;; 打印物件名稱和圖層
+          ; (princ (strcat "\nObject Name: " obj_name)) 
+          ; (princ (strcat "\n  Layer: " obj_layer))
+          (setq polyData (entget (vlax-vla-object->ename obj))) ; 獲取多段線的資料列表
+
+          ; ;; 檢查是否閉合
+          ; (setq isClosed (if (= (logand 1 (cdr (assoc 70 polyData))) 1) "Yes" "No"))
+          ; (princ (strcat "\nClosed: " isClosed))
+
+          (foreach dataItem polyData
+            (setq single_row_list '())
+            (if (= (car dataItem) 10) ; 頂點座標
+              (progn
+                (setq x (rtos (cadr dataItem) 2 4))
+                (setq y (rtos (caddr dataItem) 2 4))
+                ; (princ (strcat "\nVertex " ": (" x ", " y ")"))
+                (if (= (car dataItem) 42) ; 彎曲度
+                  (setq bulge (rtos (cdr dataItem) 2 4))
+                )
+                (setq single_row_list (list (strcase (vla-get-name doc)) obj_name obj_layer (itoa id_counter) bulge x y))
+                (setq full_list (append full_list (list single_row_list)))
+              )
+            )
+          )
+          ; 增加引數
+          (setq id_counter (1+ id_counter))
+        )
+      )
+    )
+    (vla-purgeall doc)
+    (vla-EndUndoMark doc)
+    (vla-save doc)
+    (vla-close doc)
+    (setq wall_file (cdr wall_file))
+    (setq wall_layer (cdr wall_layer))
+    (princ "\nDone.")
+  )
+  (_writecsv "W" (strcat dirpath "\\LineInfo.csv") full_list)
+)
+
 (defun output_pile_info(dirpath dwgname_list target_layer)
   (setq wall_file (nth 0 target_layer))
   (setq text_file (nth 1 target_layer))
@@ -2291,7 +2364,8 @@
     (setq dwgname_list (vl-directory-files dirpath "*.dwg" 1)) 
     (setq target_file (vl-directory-files dirpath "*.dwg" 1))
     (setq *layoutname_list* '())
-    (setq target_layer (preloop_for_plan_eval_drawing dirpath dwgname_list))
+    ; (setq target_layer (preloop_for_plan_eval_drawing dirpath dwgname_list))
+    ; (mainloop_for_Dia_plan_eval dirpath target_file target_layer)
     (setq target_layer (preloop dirpath dwgname_list))
     (setq target_layer_0 (nth 0 target_layer))
     (setq target_layer_1 (nth 1 target_layer))
@@ -2299,6 +2373,21 @@
     (mainloop1 dirpath target_file target_layer)
     (startapp "dist\\Data Process - Plan Drawings.exe" dirpath)
   ))
+; (if (and (= dtype "Elevation Drawings") (= wtype "Diaphragm"))
+;   (progn
+;     (setq dirpath (acet-ui-pickdir (strcat "Select the DIAPHRAGM WALL " (vl-princ-to-string dtype) " folder: ") 
+;                 (getvar "dwgprefix")
+;               )) ;or write (getvar "dwgprefix")
+;     (setq dwgname_list (vl-directory-files dirpath "*.dwg" 1))
+;     (setq target_file (vl-directory-files dirpath "*.dwg" 1))
+;     (setq *layoutname_list* '())
+;     (setq target_layer (preloop dirpath dwgname_list))
+;     (setq target_layer_0 (nth 0 target_layer))
+;     (setq target_layer_1 (nth 1 target_layer))
+;     (setq target_file (vl-remove-if ''( (item) (not (or (member item target_layer_0) (member item target_layer_1)))) target_file))
+;     (mainloop2 dirpath target_file target_layer)
+;     (startapp "dist\\Data Process - Elevation Drawings.exe" dirpath)
+;   ))
 (if (and (= dtype "Elevation Drawings") (= wtype "Diaphragm"))
   (progn
     (setq dirpath (acet-ui-pickdir (strcat "Select the DIAPHRAGM WALL " (vl-princ-to-string dtype) " folder: ") 
@@ -2307,12 +2396,10 @@
     (setq dwgname_list (vl-directory-files dirpath "*.dwg" 1))
     (setq target_file (vl-directory-files dirpath "*.dwg" 1))
     (setq *layoutname_list* '())
-    (setq target_layer (preloop dirpath dwgname_list))
-    (setq target_layer_0 (nth 0 target_layer))
-    (setq target_layer_1 (nth 1 target_layer))
-    (setq target_file (vl-remove-if ''( (item) (not (or (member item target_layer_0) (member item target_layer_1)))) target_file))
-    (mainloop2 dirpath target_file target_layer)
-    (startapp "dist\\Data Process - Elevation Drawings.exe" dirpath)
+    (setq target_layer (preloop_for_plan_eval_drawing dirpath dwgname_list))
+    (mainloop_for_Dia_plan_eval dirpath target_file target_layer)
+    (setq command (strcat "dist\\main.exe -t Diaphragm -d eval -c " dirpath "\\LineInfo.csv"))
+    (startapp command)
   ))
 ; if dynamic type is Structural Descriptions and wtype is Diaphragm
 ; (if (and (= dtype "Structural Descriptions")(= wtype "Diaphragm"))
