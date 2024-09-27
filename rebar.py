@@ -304,6 +304,10 @@ class BoredPile_rebar(Base_rebar):
                 Rowpile = ET.SubElement(pile, 'Rowpile', description="排樁")
                 # 在 pile 底下建立 Beam子 節點
                 Beam = ET.SubElement(pile, 'Beam', description="繫樑")
+                # 在 pile 底下建立 RebarGroup 子節點
+                RebarGroup = ET.SubElement(pile, 'RebarGroup', description="鋼筋設計")
+                ShearRebar = ET.SubElement(RebarGroup, 'ShearRebar', description="剪力筋設計")
+                Rebar = ET.SubElement(RebarGroup, 'Rebar')
                 for key, value in pile_info.items():
                     if key == "Tiebeam_width":
                         TieBeam_W = ET.SubElement(Beam, 'Width', description="繫樑寬")
@@ -322,13 +326,13 @@ class BoredPile_rebar(Base_rebar):
                         depth_value = ET.SubElement(depth, 'Value', unit="m")
                         depth_value.text = str(value)
                     elif key == "Main_rebar":
-                        ShearRebar = ET.SubElement(Rowpile, 'ShearRebar', description="剪力筋")
+                        ShearRebar = ET.SubElement(Rowpile, 'number', description="主筋設計")
                         ShearRebar_value = ET.SubElement(ShearRebar, 'Value')
                         ShearRebar_value.text = str(value)
                     elif key == "Stirrup_rebar":
-                        Stirrup = ET.SubElement(Rowpile, 'Stirrup', description="箍筋")
-                        Stirrup_value = ET.SubElement(Stirrup, 'Value')
-                        Stirrup_value.text = str(value)
+                        Type = ET.SubElement(Rebar, 'Type', description="箍筋設計")
+                        Type_value = ET.SubElement(Type, 'Value')
+                        Type_value.text = str(value)
                     elif key == "Concrete_strength":
                         # 在 Rowpile 底下建立 Concrete 子節點
                         Concrete = ET.SubElement(Rowpile, 'Concrete', description="混凝土")
