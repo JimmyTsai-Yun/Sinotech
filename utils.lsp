@@ -203,22 +203,22 @@
 )
 
 ; ---------------- Some basic functions ---------------------------------
-(defun RemoveNth ( n l )
+(defun RemoveNth ( n l ) ; 移除列表 l 的第 n 個元素
     (if (and l (< 0 n))
         (cons (car l) (RemoveNth (1- n) (cdr l)))
         (cdr l)
     )
 )
-(defun SubstNth ( a n l / i )
+(defun SubstNth ( a n l / i ) ; 把列表 l 的第 n 個元素替換為 a
     (setq i -1)
     (mapcar '(lambda ( x ) (if (= (setq i (1+ i)) n) a x)) l)
 )
-(defun dclist ( key lst )
+(defun dclist ( key lst ) ; 生成一個 dcl 列表
     (start_list key)
     (foreach itm lst (add_list itm))
     (end_list)
 )
-(defun shiftitems ( idx lb1 lb2 / int )
+(defun shiftitems ( idx lb1 lb2 / int ) ; 把列表 lb1 中的 idx 指定的元素移動到 lb2 中
     (setq int -1
           lb2 (reverse lb2)
           lb1 (vl-remove-if '(lambda ( x ) (if (member (setq int (1+ int)) idx) (setq lb2 (cons x lb2)))) lb1)
