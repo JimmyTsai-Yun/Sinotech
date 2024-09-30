@@ -71,3 +71,40 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+# 測試用 執行指令
+'''
+連續壁平面圖
+python main.py -t Diaphragm -d plan -c .\\y37_plan.csv
+
+連續壁立面圖
+python main.py -t Diaphragm -d eval -c .\\y37_eval.csv
+
+連續壁支撐配置圖
+python main.py -t Diaphragm -d rebar -c .\\y37_rebar.csv -c2 .\\y37_vertical.csv -c3 .\\y37_helper.csv -c4 .\\y37_sh_helper.csv
+'''
+
+'''
+鋼板樁平面圖
+python main.py -t SheetPile -d plan -c .\\y37_plan.csv
+
+鋼板樁立面圖
+python main.py -t SheetPile -d eval -c .\\y37_eval.csv
+
+鋼板樁支撐配置圖
+python main.py -t SheetPile -d rebar -c .\\y37_rebar.csv
+'''
+
+'''
+排樁平面圖
+python main.py -t BoredPile -d plan -c .\\y37_plan.csv
+
+排樁支撐配置圖
+python main.py -t BoredPile -d rebar -c .\\y37_rebar.csv
+'''
+
+'''
+結構一般說明
+python main.py -t Diaphragm -d structure -c .\\y37_stru.csv
+
+'''
