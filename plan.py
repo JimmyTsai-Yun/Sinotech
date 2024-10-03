@@ -312,4 +312,198 @@ class Diaphragm_plan(Base_plan):
         super().__init__(**kwargs)
 
     def run(self):
-        pass
+        def calculate_slope(start, end):
+            """計算兩點之間的斜率"""
+            if end[0] - start[0] == 0:  # 避免除以零
+                return float('inf')
+            return (end[1] - start[1]) / (end[0] - start[0])
+
+        def calculate_angle(slope1, slope2):
+            """計算兩條線之間的角度差"""
+            if slope1 == float('inf') and slope2 == float('inf'):
+                return 0  # 兩條線都是垂直的
+            elif slope1 == float('inf'):
+                return 90  # 一條線是垂直的
+            elif slope2 == float('inf'):
+                return 90  # 另一條線是垂直的
+
+            angle_rad = np.arctan(abs((slope2 - slope1) / (1 + slope1 * slope2)))  # 計算弧度
+            angle_deg = np.degrees(angle_rad)  # 轉換為度
+            return angle_deg
+
+        def calculate_perpendicular_distance(line1, line2):
+            """計算兩條線之間的平行距離"""
+            # 提取線段的起始和結束點
+            start1, end1 = np.array(line1[:2]), np.array(line1[2:])
+            start2, end2 = np.array(line2[:2]), np.array(line2[2:])
+            
+            # 使用點到直線的距離公式
+            # 直線方程為 Ax + By + C = 0
+            A = end1[1] - start1[1]
+            B = start1[0] - end1[0]
+            C = A * start1[0] + B * start1[1]
+            
+            # 計算兩端點的距離
+            distance1 = abs(A * start2[0] + B * start2[1] - C) / np.sqrt(A**2 + B**2)
+            distance2 = abs(A * end2[0] + B * end2[1] - C) / np.sqrt(A**2 + B**2)
+            
+            # 取最小距離
+            return min(distance1, distance2)
+        
+        df = pd.read_csv(self.csv_path, delimiter=',')
+
+        # drop the last column
+        df = df.iloc[:, :-1]
+
+        # 整理資料，依據 ID 和 Layer 分組
+        grouped = df.groupby(['FileName', 'ID', 'Layer'])
+
+        # 建立一個列表來存儲每條線的起始和結束座標
+        line_segments = []
+
+        # 迭代每個分組以生成線段
+        for (file_name, id_value, layer), group in grouped:
+            x_coords = group['X'].values
+            y_coords = group['Y'].values
+            
+            # 將每一對相鄰的點作為一條線段
+            for i in range(len(x_coords) - 1):
+                line_segments.append({
+                    'FileName': file_name,
+                    'ID': id_value,
+                    'Layer': layer,
+                    'Start_X': x_coords[i],
+                    'Start_Y': y_coords[i],
+                    'End_X': x_coords[i + 1],
+                    'End_Y': y_coords[i + 1]
+                })
+
+        # 將線段資訊轉換為 DataFrame
+        line_segments_df = pd.DataFrame(line_segments)
+
+        # 建立一個列表來存儲每條線及其最近平行線的距離
+        parallel_distances_angle = []
+
+        # 依據 ID 和 Layer 分組
+        for (file_name, id_value, layer), group in line_segments_df.groupby(['FileName', 'ID', 'Layer']):
+            lines = group[['Start_X', 'Start_Y', 'End_X', 'End_Y']].values
+            
+            # 對於每一條線，尋找最近的平行線
+            for line1 in lines:
+                slope1 = calculate_slope(line1[:2], line1[2:])
+                closest_distance = float('inf')  # 初始化為無窮大
+                closest_line = None  # 用來儲存最近的平行線
+                # 確認 line1 為水平線或垂直線
+                x_distance = abs(line1[2] - line1[0])
+                y_distance = abs(line1[3] - line1[1])
+                if x_distance > y_distance:
+                    direction1 = -1 if line1[0] > line1[2] else 1
+                    is_horizontal = True
+                else:
+                    direction1 = -1 if line1[1] > line1[3] else 1
+                    is_horizontal = False
+                    
+                
+                for line2 in lines:
+                    if np.array_equal(line1, line2):  # 跳過自身
+                        continue
+                    
+                    slope2 = calculate_slope(line2[:2], line2[2:])
+                    angle_diff = calculate_angle(slope1, slope2)
+
+                    if angle_diff < 5:  # 若角度差小於5度，視為平行
+                        if is_horizontal:
+                            direction2 = -1 if line2[0] > line2[2] else 1
+                        else:
+                            direction2 = -1 if line2[1] > line2[3] else 1
+                        if direction1 != direction2:
+                            distance_value = calculate_perpendicular_distance(line1, line2)
+                            if distance_value < closest_distance and distance_value > 0.05:  # 距離不為零且更近
+                                closest_distance = distance_value
+                                closest_line = line2
+                
+                # 如果找到最近的平行線，儲存其資訊
+                if closest_line is not None:
+                    parallel_distances_angle.append({
+                        'FileName': file_name,
+                        'ID': id_value,
+                        'Layer': layer,
+                        'Line_Start': (line1[0], line1[1]),
+                        'Line_End': (line1[2], line1[3]),
+                        'Closest_Line_Start': (closest_line[0], closest_line[1]),
+                        'Closest_Line_End': (closest_line[2], closest_line[3]),
+                        'Distance': closest_distance.round(2),
+                        'Length': np.sqrt((line1[2] - line1[0])**2 + (line1[3] - line1[1])**2).round(3)
+                    })
+                else:
+                    # 如果沒有找到平行線，儲存該條線的資訊，距離設為 NaN
+                    parallel_distances_angle.append({
+                        'FileName': file_name,
+                        'ID': id_value,
+                        'Layer': layer,
+                        'Line_Start': (line1[0], line1[1]),
+                        'Line_End': (line1[2], line1[3]),
+                        'Closest_Line_Start': None,
+                        'Closest_Line_End': None,
+                        'Distance': None,
+                        'Length': np.sqrt((line1[2] - line1[0])**2 + (line1[3] - line1[1])**2).round(3)
+                    })
+
+        # 將結果轉為 DataFrame 以便顯示
+        parallel_distances_angle_df = pd.DataFrame(parallel_distances_angle)
+
+        # 計算每組的線段長度總和和最常出現的距離
+        result_df = parallel_distances_angle_df.groupby(['FileName', 'Layer', 'ID']).agg(
+            Total_Length=('Length', 'sum'),
+            Most_Frequent_Distance=('Distance', lambda x: x.mode()[0] if not x.mode().empty else None)
+        ).reset_index()
+
+        result_df['Length'] = (result_df['Total_Length'] - 2*result_df['Most_Frequent_Distance'])/2
+        result_df['Length'] = result_df['Length'].round(1)
+
+        # add the the total length of the line with the same layer
+        final_df = result_df.groupby(['Layer']).agg(
+            Total_Length=('Length', 'sum'),
+            Thickness=('Most_Frequent_Distance', lambda x: x.mode()[0] if not x.mode().empty else None)
+        ).reset_index()
+
+        result_dir = {}
+        for index, row in final_df.iterrows():
+            result_dir[row['Layer']] = {'Length' : round(row['Total_Length'], 2)}
+            result_dir[row['Layer']]['Thickness'] = row['Thickness']
+
+        self.output_path = create_gui(result_dir, "Diaphragm Wall Plan")
+
+        self.save_to_xml(result_dir)
+
+        os.remove(self.csv_path)
+
+    def save_to_xml(self, response_dic):
+        print("已將資料寫入xml檔案: ", self.output_path)
+        # 檢查是否已經有xml檔案，若有則讀取，若無則創建
+        tree, root = create_or_read_xml(self.output_path)
+        # 檢查是否有plans子節點，若無則創建，若有則刪除
+        plans = root.find(".//Drawing[@description='平面圖']")
+        if plans is None:
+            plans = ET.SubElement(root, "Drawing", description="平面圖")
+
+        # 將response_list寫入配筋圖子節點
+        for wall_type, wall_info in response_dic.items():
+            wall_thickness = wall_info['Thickness']
+            wall_length = wall_info['Length']
+            if check_attribute_exists(plans, 'description', "TYPE "+str(wall_type[5:])):
+                continue
+            else:
+                WorkItemType = ET.SubElement(plans, 'WorkItemType', description="TYPE "+str(wall_type[5:]))
+                DiaphragmWall = ET.SubElement(WorkItemType, "DiaphragmWall", description="連續壁")
+
+                Thickness = ET.SubElement(DiaphragmWall, 'Thickness', description="厚度")
+                Thickness_value = ET.SubElement(Thickness, 'Value', unit="m")
+                Thickness_value.text = str(wall_thickness)
+
+                Length = ET.SubElement(DiaphragmWall, 'Length', description="行進米")
+                Length_value = ET.SubElement(Length, 'Value', unit="m")
+                Length_value.text = str(wall_length)
+        
+        # 寫入xml檔案，utf-8編碼
+        tree.write(self.output_path, encoding="utf-8")
