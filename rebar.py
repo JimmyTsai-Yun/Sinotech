@@ -840,8 +840,10 @@ class Diaphragm_rebar():
             if knockout_exists:
                 # 獲取空打深度
                 type_data['Empty_depth'] = Depth - (sum(rotated_int_list)/1000 + 1)
-                # 獲取實打深度
                 type_data['Real_depth'] = Depth - type_data['Empty_depth']
+            else:
+                type_data['Empty_depth'] = 0
+                type_data['Real_depth'] = Depth
             # print(f"空打深度: {type_data['Empty_depth']}, 實打深度: {type_data['Real_depth']}")
 
             # Sv 鋼筋
@@ -1097,11 +1099,14 @@ class Diaphragm_rebar():
 
             RealDepth = ET.SubElement(DiaphragmWall, "RealDepth", description="實打深度")
             RealDepth_value = ET.SubElement(RealDepth, "Value", unit="m")
-            RealDepth_value.text = str(data_dic['Real_depth'])
+            if data_dic['Real_depth'] == 0:
+                RealDepth_value.text = str(data_dic['Depth'])
+            else:
+                RealDepth_value.text = str(data_dic['Real_depth'])
 
             Thickness = ET.SubElement(DiaphragmWall, "Thickness", description="厚度")
             Thickness_value = ET.SubElement(Thickness, "Value", unit="mm")
-            Thickness_value.text = str(data_dic['Thickness'])
+            Thickness_value.text = str(data_dic['Thickness']/1000)
 
             RebarGroup = ET.SubElement(WorkItemType, "RebarGroup", description="鋼筋") 
 
